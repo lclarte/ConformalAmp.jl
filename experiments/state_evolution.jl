@@ -22,7 +22,7 @@ for α in ProgressBar(α_range)
     else
         problem = ConformalAmp.Ridge(α = α, Δ = 1.0, λ = λ, Δ̂ = 1.0)
     end
-    (; X, w, y) = ConformalAmp.sample_all(rng, problem, n)
+    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
     (; xhat, vhat) = ConformalAmp.gamp(problem, X, y; rtol=1e-4)
     # 
 

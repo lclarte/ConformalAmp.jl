@@ -15,7 +15,7 @@ else
     problem = ConformalAmp.Ridge(α = α, Δ = 1.0, λ = λ, Δ̂ = 1.0)
 end
 
-(; X, w, y) = ConformalAmp.sample_all(rng, problem, n)
+(; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
 @profview ConformalAmp.gamp(problem, X, y; rtol=1e-4)
 @time (; xhat, vhat, ω) = ConformalAmp.gamp(problem, X, y; rtol=1e-4)
 
