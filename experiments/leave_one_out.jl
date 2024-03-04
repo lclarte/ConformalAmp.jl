@@ -52,7 +52,7 @@ function compare_gamp_erm(model::String, d::Integer)
     display(pl)
 end
 
-function compare_at_interpolation(model::String, d::Integer; rng::AbstractRNG = StableRNG(0))
+function compare_fcp_interpolation(model::String, d::Integer; rng::AbstractRNG = StableRNG(0))
     """
     Check that interpolation, the residuals are 0 and look at the residuals
          1) given by refitting the estimator and 
@@ -113,20 +113,27 @@ function compare_at_interpolation(model::String, d::Integer; rng::AbstractRNG = 
     """
 end
 
-function compare_fcp_interpolation(d::Integer; rng::AbstractRNG = StableRNG(0))
+function compare_fcp_last_label_change(d::Integer; rng::AbstractRNG = StableRNG(0), problem_type::String = "ridge")
     """
     Compare the residuals for the leave one out when we change the label of one sample (the n-th one)
     """
-    δy_list = vcat([0.0], -10.0:2.5:10.0)
+    δy_list = vcat([0.0], -10.0:1.0:10.0)
     
-    λ = 2.0
+    λ = 1.0
     α = 0.5
     n = ConformalAmp.get_n(α, d)
     
     residuals_list_erm  = fill(0.0, (length(δy_list), n))
     residuals_list_gamp = fill(0.0, (length(δy_list), n))
 
-    problem = ConformalAmp.Lasso(α = α, Δ = 1.0, λ = λ, Δ̂ = 1.0)
+    if problem_type == "ridge"
+        problem = ConformalAmp.Ridge(α = α, Δ = 1.0, λ = λ, Δ̂ = 1.0)
+    elseif problem_type == "lasso"
+        problem = ConformalAmp.Lasso(α = α, Δ = 1.0, λ = λ, Δ̂ = 1.0)
+    else
+        error("problem type not recognized")
+    end
+    
     (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
 
     ref_y_n = y[n]
@@ -143,9 +150,10 @@ function compare_fcp_interpolation(d::Integer; rng::AbstractRNG = StableRNG(0))
     end
 
     # PLOT THE RESIDUALS WHEN CHANGING THE LABEL OF LAST SAMPLE
-    pl = scatter(δy_list[2:end],   residuals_list_gamp[2:end, 1], xaxis = "δy", yaxis = "Residuals", label = "residuals with GAMP LOO")
-    pl = scatter!(δy_list[2:end], residuals_list_erm[2:end, 1], label = "residuals with ERM LOO")
-    title!("Residuals for the 1st sample, λ = $λ, α = $α, d = $d")
+    index = n
+    pl = scatter(δy_list[2:end],   residuals_list_gamp[2:end, n], xaxis = "δy", yaxis = "Residuals", label = "residuals with GAMP LOO")
+    pl = scatter!(δy_list[2:end], residuals_list_erm[2:end, n], label = "residuals with ERM LOO")
+    title!("Residuals for the $n-th sample, λ = $λ, α = $α, d = $d")
     display(pl) 
 
     # PLOT THE HISTOGRAM (AT δy constant) of the relative difference of residuals 
@@ -156,5 +164,102 @@ function compare_fcp_interpolation(d::Integer; rng::AbstractRNG = StableRNG(0))
     # display(pl)
 end
 
+## Here, we'll plot 1) the density of the changes in the residuals when we change the label of the last sample
+# and 2) the relative difference of the residuals given by GAMP and ERM
+
+function plot_residuals_wrt_last_label(problem::ConformalAmp.RegressionProblem, d::Integer; rng::AbstractRNG=StableRNG(0), δy::Real = 0.0)
+    n = ConformalAmp.get_n(problem.α, d)
+    δy_list = [0.0, δy]
+    
+    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+
+    ref_y_n = y[n]
+
+    predictions_list_erm  = fill(0.0, (length(δy_list), n))
+    predictions_list_gamp = fill(0.0, (length(δy_list), n))
+
+    for i in (eachindex(δy_list))
+        δy = δy_list[i]
+        y[n] = ref_y_n + δy
+
+        ŵ_erm  = ConformalAmp.fit_leave_one_out(problem, X, y, ConformalAmp.ERM())
+        ŵ_gamp = ConformalAmp.fit_leave_one_out(problem, X, y, ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5))
+        
+        predictions_list_erm[i, :]  = diag(ConformalAmp.predict(problem, ŵ_erm,  X))
+        predictions_list_gamp[i, :] = diag(ConformalAmp.predict(problem, ŵ_gamp, X))
+        
+        if i > 1
+            # do two subplots where the 1st one is the histogream of ERM residuals and the 2nd one is the difference between GAMP and ERM
+            relative_difference = abs.(predictions_list_erm[i, :] - predictions_list_erm[1, :]) ./ abs.(predictions_list_erm[1, :])
+            relative_difference_erm_gamp = abs.(predictions_list_erm[i, :] - predictions_list_gamp[i, :]) ./ abs.(predictions_list_erm[i, :])
+            pl = stephist(relative_difference; bins=0:0.01:1.0, label = "Relat. diff. predictions",
+                            xlabel = "Difference", ylabel="Density", normalize=:density)
+            stephist!(pl, relative_difference_erm_gamp; bins=0.0:0.01:2.0, label = "Relat. diff. erm / gamp predictions", normalize=:density)
+            # set the title
+            title!("$(typeof(problem)), δy = $δy, d = $d, λ = $λ")
+            display(pl)
+        end
+    end
+end
+
+# alternative : for one or two random samples and the last sample (that we change the label), plot the residuals as a function of δy 
+
+function plot_residuals_wrt_last_label_single_samples(problem::ConformalAmp.RegressionProblem, d::Integer; 
+    rng::AbstractRNG=StableRNG(0), δy_max::Real = 5.0, δy_step::Real = 0.25, run_erm::Bool = true)
+    n = ConformalAmp.get_n(problem.α, d)
+    δy_list = 0.0:δy_step:δy_max
+    
+    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+
+    ref_y_n = y[n]
+
+    predictions_list_erm  = fill(0.0, (length(δy_list), n))
+    predictions_list_gamp = fill(0.0, (length(δy_list), n))
+
+    for i in (eachindex(δy_list))
+        δy = δy_list[i]
+        y[n] = ref_y_n + δy
+
+        ŵ_gamp = ConformalAmp.fit_leave_one_out(problem, X, y, ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5))
+        predictions_list_gamp[i, :] = diag(ConformalAmp.predict(problem, ŵ_gamp, X))
+        
+        if run_erm
+            ŵ_erm  = ConformalAmp.fit_leave_one_out(problem, X, y, ConformalAmp.ERM())
+            predictions_list_erm[i, :]  = diag(ConformalAmp.predict(problem, ŵ_erm , X))
+        end
+        
+    end
+
+    # last index is the one for which we change the label
+    indices = [1, 2, 3, 4, 5]
+    colors = [:red, :blue, :green, :orange, :purple]
+
+    # for the last sample, the residual is linear in δy because the output for xₙ is constant as it is held out
+
+    pl = plot(xlabel = "δy", ylabel = "ŷ(δy) - ŷ(δy = 0)", title = "$(typeof(problem)), d = $d, λ = $λ")
+
+    for index in indices
+        if run_erm
+            plot!(δy_list, predictions_list_erm[:, index] .- predictions_list_erm[1, index], linecolor=colors[index], label="")
+        end
+        plot!(δy_list, predictions_list_gamp[:, index] .- predictions_list_gamp[1, index], linestyle=:dash, linecolor=colors[index], label="")
+    end
+
+    display(pl)
+end
+
+# TODO : Plot la différence des predictions en fonction de la dimension à δy fixé. Intuition : ca scale en O(1)
+
+
+# ========== functions calls 
+
 # compare_at_interpolation("ridge", 500, rng = StableRNG(0))
-compare_fcp_interpolation(300, rng = StableRNG(0))
+# compare_fcp_last_label_change(400, rng = StableRNG(2), problem_type = "lasso")
+
+λ = 1.0
+d = 2000
+seed = 10
+
+# plot_residuals_wrt_last_label(ConformalAmp.Ridge(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), d,  rng = StableRNG(seed), δy = 5.0)
+plot_residuals_wrt_last_label_single_samples(ConformalAmp.Ridge(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), d, 
+                                                rng = StableRNG(seed), δy_step = 1.0, δy_max = 5.0, run_erm = false)

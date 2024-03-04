@@ -5,7 +5,7 @@ function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, ::Log
     return LogisticChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol)
 end
 
-function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Union{Ridge, Lasso}; rtol = 1e-3)
+function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::RegressionProblem; rtol = 1e-3)
     # use Δ̂ as it's the factor used by the student
     return RidgeChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, Δ = problem.Δ̂)
 end
