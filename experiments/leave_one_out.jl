@@ -9,6 +9,7 @@ using Plots
 using ProgressBars
 using Revise
 using StableRNGs: AbstractRNG, StableRNG
+using Statistics
 
 function compare_gamp_erm(model::String, d::Integer)
     """
@@ -248,7 +249,46 @@ function plot_residuals_wrt_last_label_single_samples(problem::ConformalAmp.Regr
     display(pl)
 end
 
-# TODO : Plot la différence des predictions en fonction de la dimension à δy fixé. Intuition : ca scale en O(1)
+function plot_label_change_wrt_d(problem::ConformalAmp.RegressionProblem, d_list::Vector{Int}, δy::Real; rng::AbstractRNG=StableRNG(0))
+    """
+    With δy being fixed, plot the average difference | ŷ - y(δy = 0) | over the train samples as a function of the dimension.
+    """
+
+    differences   = []
+    ŵ_differences = []
+
+    for d in d_list
+
+        (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+        n = ConformalAmp.get_n(problem.α, d)
+
+        ref_y_n = y[n]
+        # fit leave one out labels without chaning last label
+        ŵ_1      = ConformalAmp.fit(problem, X, y, ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5))
+        ŵ_gamp = ConformalAmp.fit_leave_one_out(problem, X, y, ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5))
+        predictions_gamp_1 = diag(ConformalAmp.predict(problem, ŵ_gamp, X))
+        # fit leave one out labels with changing last label
+        y[n] = ref_y_n + δy
+        ŵ_2      = ConformalAmp.fit(problem, X, y, ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5))
+        ŵ_gamp = ConformalAmp.fit_leave_one_out(problem, X, y, ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5))
+        predictions_gamp_2 = diag(ConformalAmp.predict(problem, ŵ_gamp, X))
+
+        push!(differences, mean(abs.(predictions_gamp_2 - predictions_gamp_1)))
+        push!(ŵ_differences, norm(ŵ_2 - ŵ_1, 2) / d)
+    end
+
+    # compute the slope of log(differences) w.r.t log(d_list)
+    x_, y_ = log.(d_list), log.(differences)
+    slope = (mean(x_ .* y_) - mean(x_) * mean(y_)) / (mean(x_ .* x_) - (mean(x_))^2)
+    slope_ŵ = (mean(x_ .* log.(ŵ_differences)) - mean(x_) * mean(log.(ŵ_differences))) / (mean(x_ .* x_) - (mean(x_))^2)
+    
+    pl = plot(d_list, differences, xlabel = "d", ylabel="log difference", title = "$(typeof(problem)), δy = $δy, α = $(problem.α), λ = $(problem.λ)", 
+            yaxis=:log, xaxis=:log, label="mean(| ŷᵢ - yᵢ(δy = 0)|); Slope : $(round(slope, digits=2))")
+    plot!(pl, d_list, ŵ_differences, label="| ŵ - ŵ(δy=0) | / d); Slope : $(round(slope_ŵ, digits=2))")
+    # save figure in plots/difference_last_label_wrt_d.png
+    savefig(pl, "plots/difference_last_label_wrt_d.png")
+    display(pl)
+end
 
 
 # ========== functions calls 
@@ -257,9 +297,10 @@ end
 # compare_fcp_last_label_change(400, rng = StableRNG(2), problem_type = "lasso")
 
 λ = 1.0
-d = 2000
+d = 5000
 seed = 10
 
 # plot_residuals_wrt_last_label(ConformalAmp.Ridge(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), d,  rng = StableRNG(seed), δy = 5.0)
-plot_residuals_wrt_last_label_single_samples(ConformalAmp.Ridge(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), d, 
-                                                rng = StableRNG(seed), δy_step = 1.0, δy_max = 5.0, run_erm = false)
+# plot_residuals_wrt_last_label_single_samples(ConformalAmp.Ridge(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), d, rng = StableRNG(seed), δy_step = 1.0, δy_max = 5.0, run_erm = false)
+
+plot_label_change_wrt_d(ConformalAmp.Ridge(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), Vector{Int}(100:100:2000), 5.0)
