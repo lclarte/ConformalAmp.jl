@@ -126,3 +126,16 @@ function get_confidence_interval(problem::Logistic, X::AbstractMatrix, y::Abstra
 
     return prediction_set
 end
+
+##
+
+function get_order_one_amp_perturbation(problem::Ridge, X::AbstractMatrix, y::AbstractVector, gampresult::GampResult; rtol::Real = 1e-3)
+    """
+    return the vector Δŵ such that for changing the last label from y[n] to y[n] + δy, the estimator is changed to ŵ + δy * Δŵ
+    """
+    (; x̂, v̂, ω, V, A, b) = gampresult
+    n, d = size(X)
+    V = (X .* X) * v̂
+    ∂yg = RidgeChannel.∂ygₒᵤₜ_and_∂ωgₒᵤₜ(y[n], ω[n], V[n]; Δ = problem.Δ, rtol = rtol)[1]
+    return ∂yg .* X[n, :] ./ (1.0 .+ A)
+end

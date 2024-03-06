@@ -8,6 +8,8 @@ end
 @kwdef struct ERM <: Method
 end
 
+### 
+
 function fit(problem::Ridge, X::AbstractMatrix, y::AbstractVector, ::ERM)
     (; Δ̂, λ) = problem
     w = (X' * X + Δ̂ * λ * I) \ (X' * y)
@@ -35,7 +37,7 @@ end
 
 function fit(problem::Problem, X::AbstractMatrix, y::AbstractVector, method::GAMP)
     (; max_iter, rtol) = method
-    return gamp(problem, X, y; max_iter=max_iter, rtol=rtol).xhat
+    return gamp(problem, X, y; max_iter=max_iter, rtol=rtol).x̂
 end
 
 ## 
@@ -50,8 +52,8 @@ function fit_leave_one_out(problem::Problem, X::AbstractMatrix, y::AbstractVecto
 end
 
 function fit_leave_one_out(problem::Problem, X::AbstractMatrix, y::AbstractVector, method::GAMP)
-    (; xhat, vhat, ω) = gamp(problem, X, y; max_iter=method.max_iter, rtol=method.rtol)
-    return get_cavity_means_from_gamp(problem, X, y, xhat, vhat, ω; rtol = method.rtol)
+    (; x̂, v̂, ω) = gamp(problem, X, y; max_iter=method.max_iter, rtol=method.rtol)
+    return get_cavity_means_from_gamp(problem, X, y, x̂, v̂, ω; rtol = method.rtol)
 end
 
 ## TODO : Regrouper dans les memes fonctions  

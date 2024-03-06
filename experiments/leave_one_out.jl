@@ -27,8 +27,8 @@ function compare_gamp_erm(model::String, d::Integer)
 
     (; X, w, y) = ConformalAmp.sample_all(StableRNG(0), problem, d)
 
-    (; xhat, vhat, ω) = ConformalAmp.gamp(problem, X, y; rtol=1e-5)
-    x̂_cavities = ConformalAmp.get_cavity_means_from_gamp(problem, X, y, xhat, vhat, ω)
+    (; x̂, v̂, ω) = ConformalAmp.gamp(problem, X, y; rtol=1e-5)
+    x̂_cavities = ConformalAmp.get_cavity_means_from_gamp(problem, X, y, x̂, v̂, ω)
 
     x̂_loo = ConformalAmp.fit_leave_one_out(problem, X, y)
     x̂     = ConformalAmp.fit(problem, X, y)
@@ -76,7 +76,7 @@ function compare_fcp_interpolation(model::String, d::Integer; rng::AbstractRNG =
     problem = model == "logistic" ? ConformalAmp.Logistic(α = α, λ = λ) : ConformalAmp.Ridge(α = α, Δ = 1.0, λ = λ, Δ̂ = 1.0)
     (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
     
-    (; xhat, vhat, ω) = ConformalAmp.gamp(problem, X, y; rtol=1e-5)
+    (; x̂, v̂, ω) = ConformalAmp.gamp(problem, X, y; rtol=1e-5)
 
     # run the leave one out and compare the difference in the predictions 
     ŵ = ConformalAmp.fit(problem, X, y)
@@ -88,7 +88,7 @@ function compare_fcp_interpolation(model::String, d::Integer; rng::AbstractRNG =
     savefig("plots/interpolation_residuals_ridge.png")
 
     ŵ_loo = ConformalAmp.fit_leave_one_out(problem, X, y)
-    ŵ_cavities = ConformalAmp.get_cavity_means_from_gamp(problem, X, y, xhat, vhat, ω, rtol = 1e-5)
+    ŵ_cavities = ConformalAmp.get_cavity_means_from_gamp(problem, X, y, x̂, v̂, ω, rtol = 1e-5)
 
     # Plot the residuals on the training data
     ŷ_loo              = diag(ConformalAmp.predict(problem, ŵ_loo, X))
@@ -257,20 +257,23 @@ function plot_label_change_wrt_d(problem::ConformalAmp.RegressionProblem, d_list
     differences   = []
     ŵ_differences = []
 
-    for d in d_list
+    method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5)
+    # method = ConformalAmp.ERM()
+
+    for d in ProgressBar(d_list)
 
         (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
         n = ConformalAmp.get_n(problem.α, d)
 
         ref_y_n = y[n]
         # fit leave one out labels without chaning last label
-        ŵ_1      = ConformalAmp.fit(problem, X, y, ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5))
-        ŵ_gamp = ConformalAmp.fit_leave_one_out(problem, X, y, ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5))
+        ŵ_1      = ConformalAmp.fit(problem, X, y, method)
+        ŵ_gamp = ConformalAmp.fit_leave_one_out(problem, X, y, method)
         predictions_gamp_1 = diag(ConformalAmp.predict(problem, ŵ_gamp, X))
         # fit leave one out labels with changing last label
         y[n] = ref_y_n + δy
-        ŵ_2      = ConformalAmp.fit(problem, X, y, ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5))
-        ŵ_gamp = ConformalAmp.fit_leave_one_out(problem, X, y, ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5))
+        ŵ_2      = ConformalAmp.fit(problem, X, y, method)
+        ŵ_gamp = ConformalAmp.fit_leave_one_out(problem, X, y, method)
         predictions_gamp_2 = diag(ConformalAmp.predict(problem, ŵ_gamp, X))
 
         push!(differences, mean(abs.(predictions_gamp_2 - predictions_gamp_1)))

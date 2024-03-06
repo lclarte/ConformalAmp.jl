@@ -1,6 +1,17 @@
 """
 Contains the code to run the BayesOpt estimator for logistic regression
 """
+
+@kwdef struct GampResult 
+    x̂::AbstractVector
+    v̂::AbstractVector
+    ω::AbstractVector
+    V::AbstractVector
+    A::AbstractVector
+    b::AbstractVector
+
+end
+
 function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, ::Logistic; rtol = 1e-3)
     return LogisticChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol)
 end
@@ -83,7 +94,8 @@ function gamp(problem::Problem, X::AbstractMatrix, y::AbstractVector; max_iter::
         end
     end
 
-    return (; xhat, vhat, ω)
+    # return (; xhat, vhat, ω)
+    return GampResult(x̂ = xhat, v̂ = vhat, ω = ω, V = V, A = A, b = b)
 end
 
 function get_cavity_means_from_gamp(problem::Problem, X::AbstractMatrix, y::AbstractVector, xhat::AbstractVector, vhat::AbstractVector, ω::AbstractVector; rtol = 1e-3)

@@ -19,15 +19,17 @@ module RidgeChannel
         return g, ∂ωg
     end
 
-    """
-    fn z0(&self, y : f64, w : f64, v : f64) -> f64 {
-            return (- 0.5 * (y - w).powi(2) / (self.variance + v)).exp() / (2.0 * PI * (self.variance + v)).sqrt();
-        }
+    ## 
 
-    fn dz0(&self, y : f64, w : f64, v : f64) -> f64 {
-        return (y - w) / (v + self.variance) * (- 0.5 * (y - w).powi(2) / (self.variance + v)).exp() / (2.0 * PI * (self.variance + v)).sqrt();
-        }
-    """
+    function ∂ygₒᵤₜ_and_∂ωgₒᵤₜ(y::Real, ω::Real, V::Real; rtol::Real, Δ::Real = 1.0)
+        """
+        Needed for full cp
+        """
+        @assert length(y) == length(ω) == length(V)
+        ∂yg = 1.0 / (Δ + V)
+        ∂y∂ωg = 0.0
+        return ∂yg, ∂y∂ωg
+    end
 
     function Z₀_and_∂μZ₀(y::Real, ω::Real, v::Real; rtol::Real, Δ::Real = 1.0)
         """
