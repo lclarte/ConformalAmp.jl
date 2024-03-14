@@ -19,9 +19,19 @@ module RidgeChannel
         return g, ∂ωg
     end
 
+    function ∂ωgₒᵤₜ_and_∂ω∂ωgₒᵤₜ(y::AbstractVector, ω::AbstractVector, V::AbstractVector; rtol::Real, Δ::Real = 1.0)
+        """
+        Vectorized version of the channel function
+        """
+        @assert length(y) == length(ω) == length(V)
+        ∂ωg = - 1.0 ./ (Δ .+ V)
+        ∂ω∂ωg = - 1.0 ./ (Δ .+ V)
+        return ∂ωg, ∂ω∂ωg
+    end
+
     ## 
 
-    function ∂ygₒᵤₜ_and_∂ωgₒᵤₜ(y::Real, ω::Real, V::Real; rtol::Real, Δ::Real = 1.0)
+    function ∂ygₒᵤₜ_and_∂y∂ωgₒᵤₜ(y::Real, ω::Real, V::Real; rtol::Real, Δ::Real = 1.0)
         """
         Needed for full cp
         """

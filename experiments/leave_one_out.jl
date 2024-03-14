@@ -256,6 +256,9 @@ function plot_label_change_wrt_d(problem::ConformalAmp.RegressionProblem, d_list
 
     differences   = []
     ŵ_differences = []
+    v̂_differences = []
+    V_differences = []
+    ω_differences = []
 
     method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5)
     # method = ConformalAmp.ERM()
@@ -266,18 +269,37 @@ function plot_label_change_wrt_d(problem::ConformalAmp.RegressionProblem, d_list
         n = ConformalAmp.get_n(problem.α, d)
 
         ref_y_n = y[n]
+
         # fit leave one out labels without chaning last label
         ŵ_1      = ConformalAmp.fit(problem, X, y, method)
+        if method isa ConformalAmp.GAMP
+            gamp_result_1 = ConformalAmp.gamp(problem, X, y)
+            v̂_1           = gamp_result_1.v̂
+            ω_1           = gamp_result_1.ω
+            V_1           = gamp_result_1.V
+        end
         ŵ_gamp = ConformalAmp.fit_leave_one_out(problem, X, y, method)
         predictions_gamp_1 = diag(ConformalAmp.predict(problem, ŵ_gamp, X))
         # fit leave one out labels with changing last label
+        
         y[n] = ref_y_n + δy
         ŵ_2      = ConformalAmp.fit(problem, X, y, method)
         ŵ_gamp = ConformalAmp.fit_leave_one_out(problem, X, y, method)
-        predictions_gamp_2 = diag(ConformalAmp.predict(problem, ŵ_gamp, X))
+        if method isa ConformalAmp.GAMP
+            gamp_result_2 = ConformalAmp.gamp(problem, X, y)
+            v̂_2            = gamp_result_2.v̂
+            ω_2            = gamp_result_2.ω
+            V_2            = gamp_result_2.V
+            push!(v̂_differences, std(v̂_2 - v̂_1))
+            push!(V_differences, std(V_2 - V_1))
+            push!(ω_differences, std(ω_2 - ω_1))
+        end
+        
+        push!(ŵ_differences, std(ŵ_2 - ŵ_1))
 
+        predictions_gamp_2 = diag(ConformalAmp.predict(problem, ŵ_gamp, X))
         push!(differences, mean(abs.(predictions_gamp_2 - predictions_gamp_1)))
-        push!(ŵ_differences, norm(ŵ_2 - ŵ_1, 2) / d)
+
     end
 
     # compute the slope of log(differences) w.r.t log(d_list)
@@ -288,8 +310,57 @@ function plot_label_change_wrt_d(problem::ConformalAmp.RegressionProblem, d_list
     pl = plot(d_list, differences, xlabel = "d", ylabel="log difference", title = "$(typeof(problem)), δy = $δy, α = $(problem.α), λ = $(problem.λ)", 
             yaxis=:log, xaxis=:log, label="mean(| ŷᵢ - yᵢ(δy = 0)|); Slope : $(round(slope, digits=2))")
     plot!(pl, d_list, ŵ_differences, label="| ŵ - ŵ(δy=0) | / d); Slope : $(round(slope_ŵ, digits=2))")
+    if method isa ConformalAmp.GAMP
+        slope_v̂ = (mean(x_ .* log.(v̂_differences)) - mean(x_) * mean(log.(v̂_differences))) / (mean(x_ .* x_) - (mean(x_))^2)
+        plot!(pl, d_list, v̂_differences, label="|v̂ - v̂(δy=0) | / d); Slope : $(round(slope_v̂, digits=3))")
+
+        slope_V = (mean(x_ .* log.(V_differences)) - mean(x_) * mean(log.(V_differences))) / (mean(x_ .* x_) - (mean(x_))^2)
+        plot!(pl, d_list, V_differences, label="|V - V(δy=0) | / d); Slope : $(round(slope_V, digits=3))")
+
+        slope_ω = (mean(x_ .* log.(ω_differences)) - mean(x_) * mean(log.(ω_differences))) / (mean(x_ .* x_) - (mean(x_))^2)
+        plot!(pl, d_list, ω_differences, label="|ω - ω(δy=0) | / d); Slope : $(round(slope_ω, digits=3))")
+    end
     # save figure in plots/difference_last_label_wrt_d.png
-    savefig(pl, "plots/difference_last_label_wrt_d.png")
+    # savefig(pl, "plots/difference_last_label_wrt_d.png")
+    display(pl)
+end
+
+function plot_histogram_weights_label_change_wrt_d(problem::ConformalAmp.RegressionProblem, d_list::Vector{Int}, δy::Real; rng::AbstractRNG=StableRNG(0))
+    """
+    Plot the histogram of how much the weights change when we change the label of the last sample
+    with ERM and GAMP. This is to check that the magnitude of the change is of order 1 / √n
+    """
+    # method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5)
+    method  = ConformalAmp.ERM()
+
+    pl = plot()
+    std_differences = []
+
+    for d in ProgressBar(d_list)
+
+        (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+        n = ConformalAmp.get_n(problem.α, d)
+
+        ref_y_n = y[n]
+        # fit leave one out labels without chaning last label
+        ŵ_1      = ConformalAmp.fit(problem, X, y, method)
+        ŵ_gamp = ConformalAmp.fit_leave_one_out(problem, X, y, method)
+        # fit leave one out labels with changing last label
+        y[n] = ref_y_n + δy
+        ŵ_2      = ConformalAmp.fit(problem, X, y, method)
+        ŵ_gamp = ConformalAmp.fit_leave_one_out(problem, X, y, method)
+
+        differences = sqrt(d) .* (ŵ_2 - ŵ_1)
+
+        push!(std_differences, std(differences))
+
+        stephist!(pl, differences, label="d = $d", bins=100, normalize=:pdf)
+    end
+
+    for diff in std_differences
+        println("d = $d, std of differences : ", diff)
+    end
+
     display(pl)
 end
 
@@ -300,10 +371,11 @@ end
 # compare_fcp_last_label_change(400, rng = StableRNG(2), problem_type = "lasso")
 
 λ = 1.0
-d = 5000
+d = 2000
 seed = 10
 
 # plot_residuals_wrt_last_label(ConformalAmp.Ridge(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), d,  rng = StableRNG(seed), δy = 5.0)
 # plot_residuals_wrt_last_label_single_samples(ConformalAmp.Ridge(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), d, rng = StableRNG(seed), δy_step = 1.0, δy_max = 5.0, run_erm = false)
 
-plot_label_change_wrt_d(ConformalAmp.Ridge(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), Vector{Int}(100:100:2000), 5.0)
+plot_label_change_wrt_d(ConformalAmp.Lasso(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), Vector{Int}(1000:100:5000), 5.0; rng = StableRNG(20))
+# plot_histogram_weights_label_change_wrt_d(ConformalAmp.Ridge(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), Vector{Int}(500:500:2000), 5.0)

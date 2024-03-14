@@ -9,7 +9,6 @@ Contains the code to run the BayesOpt estimator for logistic regression
     V::AbstractVector
     A::AbstractVector
     b::AbstractVector
-
 end
 
 function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, ::Logistic; rtol = 1e-3)
@@ -19,6 +18,18 @@ end
 function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::RegressionProblem; rtol = 1e-3)
     # use Δ̂ as it's the factor used by the student
     return RidgeChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, Δ = problem.Δ̂)
+end
+
+# 
+
+function ∂ωchannel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::RegressionProblem; rtol = 1e-3)
+    # use Δ̂ as it's the factor used by the student
+    return RidgeChannel.∂ωgₒᵤₜ_and_∂ω∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, Δ = problem.Δ̂)
+end
+
+function ∂ychannel(y::Real, ω::Real, V::Real, problem::RegressionProblem; rtol = 1e-3)
+    # use Δ̂ as it's the factor used by the student
+    return RidgeChannel.∂ygₒᵤₜ_and_∂y∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, Δ = problem.Δ̂)
 end
 
 function prior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic})
@@ -36,27 +47,82 @@ function prior(b::AbstractVector, A::AbstractVector, problem::Lasso)
     """
     (; λ) = problem
 
-    function fa(r, sigma)
-        if abs(r) < λ * sigma
+    function fa(b_, A_) # sigma = 1 / A > 0, r = b / A
+        if abs(b_) < λ
             return 0.0
-        elseif r > λ * sigma
-            return r - λ * sigma
+        elseif b_ > λ
+            return (b_ - λ) / A_
         else
-            return r + λ * sigma
+            return (b_ + λ) / A_
         end
     end
 
-    function fv(r, sigma)
-        if abs(r) < λ * sigma
+    function fv(b_, A_)
+        if abs(b_) < λ
             return 0.0
         else
-            return sigma
+            return 1.0 / A_
        end
     end
 
-    Σ, R = 1. ./ A, b ./ A
-    return fa.(R, Σ), fv.(R, Σ)
+    return fa.(b, A), fv.(b, A)
 end
+
+## derivatives of the prior for regression problem, useful for 
+
+function ∂bprior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic})
+    (; λ) = problem
+
+    return (1 ./ A) ./ (λ ./ A .+ 1.0), zeros(size(b))
+end
+
+function ∂Aprior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic})
+    (; λ) = problem
+
+    return - b ./ (λ .+ A).^2., - 1.0 ./ (λ .+ A).^2.
+end
+
+function ∂bprior(b::AbstractVector, A::AbstractVector, problem::Lasso)
+    (; λ) = problem
+
+    function ∂bfa(b_, A_)
+        if abs(b_) < λ
+            return 0.0
+        else
+            return 1.0 / A_
+        end
+    end
+
+    return ∂bfa.(b, A), zeros(size(b))
+end
+
+function ∂Aprior(b::AbstractVector, A::AbstractVector, problem::Lasso)
+    (; λ) = problem
+
+    function ∂Afa(b_, A_) # sigma = 1 / A > 0, r = b / A
+        if abs(b_) < λ
+            return 0.0
+        elseif b_ > λ
+            return -(b_ - λ) / A_^2.
+        else
+            return -(b_ + λ) / A_^2.
+        end
+    end
+    
+    function ∂Afv(b_, A_)
+        if abs(b_) < λ
+            return 0.0
+        else
+            return - 1.0 / A_^2.
+       end
+    end
+
+    return ∂Afa.(b, A), ∂Afv.(b, A)
+end
+
+
+
+## 
 
 function gamp(problem::Problem, X::AbstractMatrix, y::AbstractVector; max_iter::Integer = 100, rtol::Real = 1e-3)
     (; λ) = problem
@@ -109,4 +175,56 @@ function get_cavity_means_from_gamp(problem::Problem, X::AbstractMatrix, y::Abst
     V = Xsquared * vhat
     gout, dgout = channel(y, ω, V, problem, rtol = rtol)
     return xhat_tiled - X .* (vhat * gout')'
+end
+
+function compute_order_one_perturbation_gamp(problem::RegressionProblem, X::AbstractMatrix, y::AbstractVector, result::GampResult; max_iter::Integer = 10, rtol::Real = 1e-3, δy::Real = 1.0)
+    """
+    The idea is to use the convergence of GAMP algo and iterate over Δx̂, Δv̂, ΔV and Δω until convergence. the Δw returned is for δy = 1 
+    By convention, we'll assume the last sample sees its label changed
+    """
+    n, d = size(X)
+    (; x̂, v̂, ω, V, A, b) = result
+    g, ∂g = channel(y, ω, V, problem; rtol = rtol)
+
+    
+    
+    X_squared = X .* X
+    Δx̂, Δv̂ = zeros(d), zeros(d)
+    ΔA, Δb = zeros(d), zeros(d)
+    Δg, Δ∂g= zeros(n), zeros(n)
+    Δω, ΔV = zeros(n), zeros(n)
+    
+    ∂ychannel_ = ∂ychannel(y[n], ω[n], V[n], problem; rtol = rtol)
+    ∂ωchannel_ = ∂ωchannel(y, ω, V, problem; rtol = rtol)
+    
+    ∂bprior_ = ∂bprior(b, A, problem)
+    ∂Aprior_ = ∂Aprior(b, A, problem)
+    
+    eₙ = zeros(n)
+    eₙ[n] = (δy .* ∂ychannel_[1])
+
+    ∂eₙ = zeros(n)
+    ∂eₙ[n] = (δy .* ∂ychannel_[2])
+
+    for iteration in 1:max_iter
+        ΔV = X_squared * Δv̂
+        Δω = X * Δx̂ - ΔV .* g - V .* Δg
+
+        
+
+        Δg, Δ∂g = ∂ωchannel_[1] .* Δω .+ eₙ, ∂ωchannel_[2] .* Δω .+ ∂eₙ
+        ΔA = - (X_squared)' * Δ∂g
+        Δb = X' * Δg + A .* Δx̂ + ΔA .* x̂
+
+        Δx̂_old = copy(Δx̂)
+        
+        Δx̂ = ∂bprior_[1] .* Δb .+ ∂Aprior_[1] .* ΔA
+        Δv̂ = ∂bprior_[2] .* Δb .+ ∂Aprior_[2] .* ΔA
+
+        if norm(Δx̂ - Δx̂_old) / norm(Δx̂) < rtol
+            break
+        end
+    end
+
+    return GampResult(x̂ = Δx̂, v̂ = Δv̂, ω = Δω, V = ΔV, A = ΔA, b = Δb)
 end
