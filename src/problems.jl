@@ -15,6 +15,13 @@ end
     α::Float64
 end
 
+@kwdef struct Pinball <: RegressionProblem
+    Δ::Float64
+    q::Float64 # to estimate quantile q
+    λ::Float64
+    α::Float64
+end
+
 @kwdef struct Lasso <: RegressionProblem
     Δ::Float64
     Δ̂::Float64

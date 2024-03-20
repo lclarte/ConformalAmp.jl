@@ -2,6 +2,8 @@
 Contains the code to run the BayesOpt estimator for logistic regression
 """
 
+import Base: -, +, *
+
 @kwdef struct GampResult 
     x̂::AbstractVector
     v̂::AbstractVector
@@ -10,6 +12,42 @@ Contains the code to run the BayesOpt estimator for logistic regression
     A::AbstractVector
     b::AbstractVector
 end
+
+
+function Base.:+(res1::GampResult, res2::GampResult)
+    return GampResult(
+        v̂ = res1.v̂ + res2.v̂,
+        x̂ = res1.x̂ + res2.x̂,
+        ω = res1.ω + res2.ω,
+        V = res1.V + res2.V,
+        A = res1.A + res2.A,
+        b = res1.b + res2.b
+    )
+end
+
+function Base.:-(res1::GampResult, res2::GampResult)
+    return GampResult(
+        x̂ = res1.x̂ - res2.x̂,
+        v̂ = res1.v̂ - res2.v̂,
+        ω = res1.ω - res2.ω,
+        V = res1.V - res2.V,
+        A = res1.A - res2.A,
+        b = res1.b - res2.b
+    )
+end
+
+function Base.:*(c::Real, res::GampResult)
+    return GampResult(
+        x̂ = c * res.x̂,
+        v̂ = c * res.v̂,
+        ω = c * res.ω,
+        V = c * res.V,
+        A = c * res.A,
+        b = c * res.b
+    )
+end
+
+## 
 
 function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, ::Logistic; rtol = 1e-3)
     return LogisticChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol)
@@ -191,6 +229,7 @@ function compute_order_one_perturbation_gamp(problem::RegressionProblem, X::Abst
     X_squared = X .* X
     Δx̂, Δv̂ = zeros(d), zeros(d)
     ΔA, Δb = zeros(d), zeros(d)
+
     Δg, Δ∂g= zeros(n), zeros(n)
     Δω, ΔV = zeros(n), zeros(n)
     
@@ -199,25 +238,21 @@ function compute_order_one_perturbation_gamp(problem::RegressionProblem, X::Abst
     
     ∂bprior_ = ∂bprior(b, A, problem)
     ∂Aprior_ = ∂Aprior(b, A, problem)
-    
-    eₙ = zeros(n)
-    eₙ[n] = (δy .* ∂ychannel_[1])
-
-    ∂eₙ = zeros(n)
-    ∂eₙ[n] = (δy .* ∂ychannel_[2])
 
     for iteration in 1:max_iter
         ΔV = X_squared * Δv̂
         Δω = X * Δx̂ - ΔV .* g - V .* Δg
 
-        
+        Δg, Δ∂g = ∂ωchannel_[1] .* Δω, ∂ωchannel_[2] .* Δω
 
-        Δg, Δ∂g = ∂ωchannel_[1] .* Δω .+ eₙ, ∂ωchannel_[2] .* Δω .+ ∂eₙ
+        Δg[n] += δy * ∂ychannel_[1]
+        Δ∂g[n]+= δy * ∂ychannel_[2]
+
         ΔA = - (X_squared)' * Δ∂g
         Δb = X' * Δg + A .* Δx̂ + ΔA .* x̂
 
         Δx̂_old = copy(Δx̂)
-        
+
         Δx̂ = ∂bprior_[1] .* Δb .+ ∂Aprior_[1] .* ΔA
         Δv̂ = ∂bprior_[2] .* Δb .+ ∂Aprior_[2] .* ΔA
 
