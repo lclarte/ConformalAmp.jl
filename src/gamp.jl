@@ -11,6 +11,8 @@ import Base: -, +, *
     V::AbstractVector
     A::AbstractVector
     b::AbstractVector
+    g::AbstractVector
+    dg::AbstractVector
 end
 
 
@@ -21,7 +23,8 @@ function Base.:+(res1::GampResult, res2::GampResult)
         ω = res1.ω + res2.ω,
         V = res1.V + res2.V,
         A = res1.A + res2.A,
-        b = res1.b + res2.b
+        b = res1.b + res2.b,
+        dg = res1.dg + res2.dg,
     )
 end
 
@@ -32,7 +35,9 @@ function Base.:-(res1::GampResult, res2::GampResult)
         ω = res1.ω - res2.ω,
         V = res1.V - res2.V,
         A = res1.A - res2.A,
-        b = res1.b - res2.b
+        b = res1.b - res2.b,
+        g = res1.g - res2.g,
+        dg = res1.dg - res2.dg,
     )
 end
 
@@ -43,7 +48,9 @@ function Base.:*(c::Real, res::GampResult)
         ω = c * res.ω,
         V = c * res.V,
         A = c * res.A,
-        b = c * res.b
+        b = c * res.b,
+        g = c * res.g,
+        dg= c * res.dg
     )
 end
 
@@ -199,20 +206,7 @@ function gamp(problem::Problem, X::AbstractMatrix, y::AbstractVector; max_iter::
     end
 
     # return (; xhat, vhat, ω)
-    return GampResult(x̂ = xhat, v̂ = vhat, ω = ω, V = V, A = A, b = b)
-end
-
-function get_cavity_means_from_gamp(problem::Problem, X::AbstractMatrix, y::AbstractVector, xhat::AbstractVector, vhat::AbstractVector, ω::AbstractVector; rtol = 1e-3)
-    """
-    return a matrix n x d such that the i-th row is the estimator where the i-th sample has been removed 
-    """
-    Xsquared = X .* X
-    n, d     = size(X)
-
-    xhat_tiled  = repeat(xhat', n, 1)
-    V = Xsquared * vhat
-    gout, dgout = channel(y, ω, V, problem, rtol = rtol)
-    return xhat_tiled - X .* (vhat * gout')'
+    return GampResult(x̂ = xhat, v̂ = vhat, ω = ω, V = V, A = A, b = b, g = g, dg = dg)
 end
 
 function compute_order_one_perturbation_gamp(problem::RegressionProblem, X::AbstractMatrix, y::AbstractVector, result::GampResult; max_iter::Integer = 10, rtol::Real = 1e-3, δy::Real = 1.0)
@@ -261,5 +255,18 @@ function compute_order_one_perturbation_gamp(problem::RegressionProblem, X::Abst
         end
     end
 
-    return GampResult(x̂ = Δx̂, v̂ = Δv̂, ω = Δω, V = ΔV, A = ΔA, b = Δb)
+    return GampResult(x̂ = Δx̂, v̂ = Δv̂, ω = Δω, V = ΔV, A = ΔA, b = Δb, g = Δg, dg = Δ∂g)
+end
+
+function get_cavity_means_from_gamp(problem::Problem, X::AbstractMatrix, y::AbstractVector, xhat::AbstractVector, vhat::AbstractVector, ω::AbstractVector; rtol = 1e-3)
+    """
+    return a matrix n x d such that the i-th row is the estimator where the i-th sample has been removed 
+    """
+    Xsquared = X .* X
+    n, d     = size(X)
+
+    xhat_tiled  = repeat(xhat', n, 1)
+    V = Xsquared * vhat
+    gout, dgout = channel(y, ω, V, problem, rtol = rtol)
+    return xhat_tiled - X .* (vhat * gout')'
 end

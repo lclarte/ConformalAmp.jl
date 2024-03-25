@@ -29,13 +29,13 @@ module PinballChannel
         res = NLSolvers.solve(optprob, init, solver, options)
 
         prox = res.info.solution
-        ∂ωprox = inv(1 + V * logistic_loss_der2(y, prox))  # implicit function theorem
+        # Since the loss is affine by part, the second derivative of the loss is 0 almost everywhere 
+        # and ∂ωprox = 1.0 and ∂ωgₒᵤₜ = 0 ? 
+        # ∂ωprox = inv(1 + V * logistic_loss_der2(y, prox)) 
+        # ∂ωgₒᵤₜ = (∂ωprox - 1) / V
 
         gₒᵤₜ = (prox - ω) / V
-        ∂ωgₒᵤₜ = (∂ωprox - 1) / V
-
-        gₒᵤₜ   = nothing
-        ∂ωgₒᵤₜ = nothing
+        ∂ωgₒᵤₜ = 0.0
         return gₒᵤₜ, ∂ωgₒᵤₜ 
     end
 
@@ -55,10 +55,11 @@ module PinballChannel
     function ∂ωgₒᵤₜ_and_∂ω∂ωgₒᵤₜ(y::AbstractVector, ω::AbstractVector, V::AbstractVector; rtol::Real, Δ::Real = 1.0)
         """
         Vectorized version of the channel function
+        NOTE : Weird that the 1st and 2nd derivatives are 0 ... 
         """
         @assert length(y) == length(ω) == length(V)
-        ∂ωg   = nothing
-        ∂ω∂ωg = nothing
+        ∂ωg   = 0.0
+        ∂ω∂ωg = 0.0
         return ∂ωg, ∂ω∂ωg
     end
 

@@ -88,7 +88,8 @@ function test_gamp_order_one()
     display(pl)
 end
 
-function test_gamp_order_one_wrt_d(problem::ConformalAmp.Problem, d_range::AbstractRange; δy::Real = 5.0, rng_num::Integer = 0)
+function test_gamp_order_one_wrt_d(problem::ConformalAmp.Problem, d_range::AbstractRange; 
+                                δy::Real = 5.0, rng_num::Integer = 0, avg_num::Integer = 1, var::String = "x̂")
     """
     Compute the std of the following differences
         * x̂(δy) - x̂(0) computed by refitting 
@@ -106,72 +107,92 @@ function test_gamp_order_one_wrt_d(problem::ConformalAmp.Problem, d_range::Abstr
     # differences_refit and differences_taylor don't have to be close to 0
     # but must be close to one another
     differences_refit = Dict(
-        "x̂" => [],
-        "v̂" => [],
-        "ω" => [],
-        "V" => []
+        "x̂" => fill(0.0, (avg_num, length(d_range))),
+        "v̂" => fill(0.0, (avg_num, length(d_range))),
+        "ω" => fill(0.0, (avg_num, length(d_range))),
+        "V" => fill(0.0, (avg_num, length(d_range)))
     )
+
+    # also compute the difference between two ERM fit because 
+    # for Lasso I think refitting GAMP is imprecise
+    differences_refit_erm = Dict(
+        "x̂" => fill(0.0, (avg_num, length(d_range))),
+    )
+
     differences_taylor = Dict(
-        "x̂" => [],
-        "v̂" => [],
-        "ω" => [],
-        "V" => []
+        "x̂" => fill(0.0, (avg_num, length(d_range))),
+        "v̂" => fill(0.0, (avg_num, length(d_range))),
+        "ω" => fill(0.0, (avg_num, length(d_range))),
+        "V" => fill(0.0, (avg_num, length(d_range)))
     )
 
     differences_refit_taylor = Dict(
-        "x̂" => [],
-        "v̂" => [],
-        "ω" => [],
-        "V" => []
+        "x̂" => fill(0.0, (avg_num, length(d_range))),
+        "v̂" => fill(0.0, (avg_num, length(d_range))),
+        "ω" => fill(0.0, (avg_num, length(d_range))),
+        "V" => fill(0.0, (avg_num, length(d_range)))
     )
 
-    times_refit  = []
-    times_taylor = []
+    times_refit  = fill(0.0, (avg_num, length(d_range)))
+    times_taylor = fill(0.0, (avg_num, length(d_range)))
     
-    for d in ProgressBar(d_range)
-        n = ConformalAmp.get_n(α, d)
-        (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
-        result  = ConformalAmp.gamp(problem, X, y; max_iter =  method.max_iter, rtol =  method.rtol)
-        
-        debut_taylor = time()
-        # ∂ResultGamp × δy
-        Δresult = ConformalAmp.compute_order_one_perturbation_gamp(problem, X, y, result; max_iter = method.max_iter, rtol = method.rtol, δy = δy)
-        fin_taylor = time()
-        
-        y[n] = y[n] + δy
-        debut_refit = time()
-        result_refit = ConformalAmp.gamp(problem, X, y; max_iter = method.max_iter, rtol =  method.rtol)
-        fin_refit = time()
+    for i in 1:avg_num
+        for i_d in ProgressBar(eachindex(d_range))
+            d = d_range[i_d]
+            n = ConformalAmp.get_n(α, d)
+            (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+            result  = ConformalAmp.gamp(problem, X, y; max_iter =  method.max_iter, rtol =  method.rtol)
+            result_erm = ConformalAmp.fit(problem, X, y, ConformalAmp.ERM())
+            
+            debut_taylor = time()
+            # ∂ResultGamp × δy
+            Δresult = ConformalAmp.compute_order_one_perturbation_gamp(problem, X, y, result; max_iter = method.max_iter, rtol = method.rtol, δy = δy)
+            fin_taylor = time()
+            
+            y[n] = y[n] + δy
+            debut_refit = time()
+            result_refit = ConformalAmp.gamp(problem, X, y; max_iter = method.max_iter, rtol =  method.rtol)
+            fin_refit = time()
 
-        diff_refit_0 = result_refit - result
-        diff_refit_taylor = result_refit - (result + δy * Δresult)
+            result_erm_refit = ConformalAmp.fit(problem, X, y, ConformalAmp.ERM())
+            differences_refit_erm["x̂"][i, i_d] = std(result_erm - result_erm_refit)
 
-        push!(differences_refit["x̂"] ,std(diff_refit_0.x̂))
-        push!(differences_taylor["x̂"], std(Δresult.x̂))
-        push!(differences_refit_taylor["x̂"], std(diff_refit_taylor.x̂))
-        
-        push!(differences_refit["v̂"] ,std(diff_refit_0.v̂))
-        push!(differences_taylor["v̂"], std(Δresult.v̂))
-        push!(differences_refit_taylor["v̂"], std(diff_refit_taylor.v̂))
+            diff_refit_0 = result_refit - result
+            diff_refit_taylor = result_refit - (result + Δresult)
+            
+            differences_refit["x̂"][i,i_d] = std(diff_refit_0.x̂)
+            differences_taylor["x̂"][i,i_d]= std(Δresult.x̂)
+            differences_refit_taylor["x̂"][i, i_d] = std(diff_refit_taylor.x̂)
+            
+            differences_refit["v̂"][i, i_d] = std(diff_refit_0.v̂)
+            differences_taylor["v̂"][i, i_d] = std(Δresult.v̂)
+            differences_refit_taylor["v̂"][i, i_d] = std(diff_refit_taylor.v̂)
 
-        push!(differences_refit["ω"] ,std(diff_refit_0.ω))
-        push!(differences_taylor["ω"], std(Δresult.ω))
-        push!(differences_refit_taylor["ω"], std(diff_refit_taylor.ω))
+            differences_refit["ω"][i, i_d] = std(diff_refit_0.ω)
+            differences_taylor["ω"][i, i_d] = std(Δresult.ω)
+            differences_refit_taylor["ω"][i, i_d] = std(diff_refit_taylor.ω)
 
-        push!(differences_refit["V"], std(diff_refit_0.V))
-        push!(differences_taylor["V"], std(Δresult.ω))
-        push!(differences_refit_taylor["V"], std(diff_refit_taylor.ω))
+            differences_refit["V"][i, i_d] = std(diff_refit_0.V)
+            differences_taylor["V"][i, i_d] = std(Δresult.ω)
+            differences_refit_taylor["V"][i, i_d] = std(diff_refit_taylor.ω)
 
-        push!(times_refit, fin_refit - debut_refit)
-        push!(times_taylor, fin_taylor - debut_taylor)
-    end 
-
+            times_refit[i, i_d]  = fin_refit - debut_refit
+            times_taylor[i, i_d] = fin_taylor - debut_taylor
+        end 
+    end
     #                     PLOT THE DIFF. BETWEEN ORIGINAL AND THE REFIT (=GROUND TRUTH) AND TAYLOR
-    var = "ω"
-    pl = plot(d_range, differences_refit[var], xaxis = :log, yaxis = :log, label="Difference with refit")
-    plot!(d_range, differences_taylor[var], label="Difference with Taylor")
-    title!(pl, "slope(refit)  = $(slope_of_log(d_range, differences_refit[var])), 
-                slope(taylor) = $(slope_of_log(d_range, differences_taylor[var]))")
+    mean_differences_refit = Statistics.mean(differences_refit[var], dims=1)[1, :]
+    mean_differences_taylor = Statistics.mean(differences_taylor[var], dims=1)[1, :]
+    pl = plot(d_range, mean_differences_refit, xaxis = :log, yaxis = :log, label="Difference refit (GAMP)")
+    plot!(d_range, mean_differences_taylor, label="Difference Taylor")
+
+    if var == "x̂"
+        mean_differences_erm_refit = Statistics.mean(differences_refit_erm[var], dims=1)[1, :]
+        plot!(d_range, mean_differences_erm_refit, label="Diff. refit (ERM)")
+    end
+
+    title!(pl, "slope(refit)  = $(slope_of_log(d_range, mean_differences_refit)), 
+                slope(taylor) = $(slope_of_log(d_range, mean_differences_taylor))")
     display(pl)
 
     #                     PLOT THE DIFFERENCE BETWEEN REFIT AND TAYLOR 
@@ -185,14 +206,67 @@ function test_gamp_order_one_wrt_d(problem::ConformalAmp.Problem, d_range::Abstr
     # display(pl)
 end
 
+function test_gamp_order_one_loo_wrt_d(problem::ConformalAmp.Problem, d_range::AbstractRange; δy::Real = 1.0, rng_num::Integer = 0)
+    """
+    Dans cette fonction on va voir si GAMP + Taylor + LOO (Algo 1) permet d'approximer le vrai LOO obtenu par ERM (Algo 2)
+    Pour ce faire, en fonction de d, on va faire tourner Algo 1 et Algo 2 pour calculer la matrice d x n des LOO estimators,
+    regarder la moyenne de la norme des differences (par exemple) et regarder le rythme a partir duquel elle decay
+    """
+    rng = StableRNG(rng_num)
+
+    method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-3)
+
+    difference_norm = []
+    ΔŴ_erm_norm     = []
+
+    for i_d in ProgressBar(eachindex(d_range))
+        d = d_range[i_d]
+        n = ConformalAmp.get_n(α, d)
+        (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+        ỹ = copy(y)
+        ỹ[n] = y[n] + δy
+
+        # fit ERM twice
+        Ŵ_erm   = ConformalAmp.fit_leave_one_out(problem, X, y, ConformalAmp.ERM())
+        Ŵ_erm_2 = ConformalAmp.fit_leave_one_out(problem, X, ỹ, ConformalAmp.ERM())
+        ΔŴ_erm = Ŵ_erm_2 - Ŵ_erm 
+
+        # push!(ΔŴ_erm_norm, mean([norm(ΔŴ_erm[i, :], 2) for i in 1:1:n]) / d)
+        push!(ΔŴ_erm_norm, mean([std(ΔŴ_erm[i, :]) for i in 1:1:n]))
+        
+        result_gamp = ConformalAmp.gamp(problem, X, y; max_iter = method.max_iter, rtol =  method.rtol)
+        small_δy = 0.1 # used so that the Taylor approximation is valid
+        # derivative w.r.t δy
+        Δresult_gamp = (1.0 / small_δy) * ConformalAmp.compute_order_one_perturbation_gamp(problem, X, y, result_gamp; max_iter = method.max_iter, rtol = method.rtol, δy = small_δy)
+        Δŵ = Δresult_gamp.x̂
+        Δv̂ = Δresult_gamp.v̂
+        Δg = Δresult_gamp.g
+        v̂  = result_gamp.v̂
+        g  = result_gamp.g
+
+        # compute the difference of the cavity means using GAMP
+        ΔŴ_gamp = δy * ( repeat(Δŵ', n, 1) - X .* (v̂ * Δg' + Δv̂ * g')')
+
+        # push!(difference_norm, mean([norm(ΔŴ_erm[i, :] - ΔŴ_gamp[i, :], 2) for i in 1:1:n]) / d)
+        push!(difference_norm, mean([std(ΔŴ_erm[i, :] - ΔŴ_gamp[i, :]) for i in 1:1:n]) )
+    end
+
+    slope = slope_of_log(d_range, difference_norm)
+    slope_erm = slope_of_log(d_range, ΔŴ_erm_norm)
+
+    pl = plot(d_range, difference_norm, xaxis=:log, yaxis=:log, label="Diff. ERM vs GAMP : slope=$(slope)")
+    plot!(d_range, ΔŴ_erm_norm, label="diff. before and after δy : slope=$(slope_erm)")
+    display(pl)
+
+end
+
 # fcp_with_order_one()
 # test_gamp_order_one()
    
-λ = 1e-1
+λ = 1.0
 α = 2.0
 
 # TODO : Do profiling to see where we waste the most time in the computation
-test_gamp_order_one_wrt_d( ConformalAmp.Lasso(α = α, λ = λ, Δ = 1.0, Δ̂ = 1.0),
-                          100:50:2000,
-                          δy = 0.5,
-                          rng_num = 0)
+# test_gamp_order_one_wrt_d( ConformalAmp.Lasso(α = α, λ = λ, Δ = 1.0, Δ̂ = 1.0), 100:100:2000, δy = 0.2, rng_num = 0, avg_num = 5,  var="v̂")
+
+test_gamp_order_one_loo_wrt_d( ConformalAmp.Lasso(α = α, λ = λ, Δ = 1.0, Δ̂ = 1.0), 100:50:600; rng_num = 10)
