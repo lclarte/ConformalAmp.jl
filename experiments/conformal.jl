@@ -215,9 +215,12 @@ function test_gamp_order_one_loo_wrt_d(problem::ConformalAmp.Problem, d_range::A
     rng = StableRNG(rng_num)
 
     method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-3)
+    small_δy = 0.1 # used so that the Taylor approximation is valid
 
-    difference_norm = []
+    erm_taylor_difference_norm = []
+    erm_gamp_difference_norm   = []
     ΔŴ_erm_norm     = []
+    
 
     for i_d in ProgressBar(eachindex(d_range))
         d = d_range[i_d]
@@ -225,36 +228,45 @@ function test_gamp_order_one_loo_wrt_d(problem::ConformalAmp.Problem, d_range::A
         (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
         ỹ = copy(y)
         ỹ[n] = y[n] + δy
+        ỹ_gamp = copy(y)
+        ỹ_gamp[n] = y[n] + small_δy
 
         # fit ERM twice
         Ŵ_erm   = ConformalAmp.fit_leave_one_out(problem, X, y, ConformalAmp.ERM())
         Ŵ_erm_2 = ConformalAmp.fit_leave_one_out(problem, X, ỹ, ConformalAmp.ERM())
         ΔŴ_erm = Ŵ_erm_2 - Ŵ_erm 
-
-        # push!(ΔŴ_erm_norm, mean([norm(ΔŴ_erm[i, :], 2) for i in 1:1:n]) / d)
         push!(ΔŴ_erm_norm, mean([std(ΔŴ_erm[i, :]) for i in 1:1:n]))
+
+        # fit GAMP twice at small_δy and extrapolate for δy
+        Ŵ_gamp   =  ConformalAmp.fit_leave_one_out(problem, X, y, method)
+        Ŵ_gamp_small_δy =  ConformalAmp.fit_leave_one_out(problem, X, ỹ_gamp, method)
+        Ŵ_gamp_δy  = Ŵ_gamp + δy / small_δy * (Ŵ_gamp_small_δy - Ŵ_gamp)
         
+        push!(erm_gamp_difference_norm, mean([std(Ŵ_gamp_δy[i, :] - Ŵ_erm_2[i, :]) for i in 1:1:n]))
+
         result_gamp = ConformalAmp.gamp(problem, X, y; max_iter = method.max_iter, rtol =  method.rtol)
-        small_δy = 0.1 # used so that the Taylor approximation is valid
+        
         # derivative w.r.t δy
-        Δresult_gamp = (1.0 / small_δy) * ConformalAmp.compute_order_one_perturbation_gamp(problem, X, y, result_gamp; max_iter = method.max_iter, rtol = method.rtol, δy = small_δy)
+        Δresult_gamp = (δy / small_δy) * ConformalAmp.compute_order_one_perturbation_gamp(problem, X, y, result_gamp; max_iter = method.max_iter, rtol = method.rtol, δy = small_δy)
         Δŵ = Δresult_gamp.x̂
         Δv̂ = Δresult_gamp.v̂
         Δg = Δresult_gamp.g
         v̂  = result_gamp.v̂
         g  = result_gamp.g
 
-        # compute the difference of the cavity means using GAMP
-        ΔŴ_gamp = δy * ( repeat(Δŵ', n, 1) - X .* (v̂ * Δg' + Δv̂ * g')')
+        # compute the new cavity means using GAMP
+        Ŵ_taylor = Ŵ_gamp + (repeat(Δŵ', n, 1) - X .* (v̂ * Δg' + Δv̂ * g')')
 
         # push!(difference_norm, mean([norm(ΔŴ_erm[i, :] - ΔŴ_gamp[i, :], 2) for i in 1:1:n]) / d)
-        push!(difference_norm, mean([std(ΔŴ_erm[i, :] - ΔŴ_gamp[i, :]) for i in 1:1:n]) )
+        push!(erm_taylor_difference_norm, mean([std(Ŵ_erm_2[i, :] - Ŵ_taylor[i, :]) for i in 1:1:n]) )
+        
     end
 
-    slope = slope_of_log(d_range, difference_norm)
+    slope = slope_of_log(d_range, erm_taylor_difference_norm)
     slope_erm = slope_of_log(d_range, ΔŴ_erm_norm)
 
-    pl = plot(d_range, difference_norm, xaxis=:log, yaxis=:log, label="Diff. ERM vs GAMP : slope=$(slope)")
+    pl = plot(d_range, erm_taylor_difference_norm, xaxis=:log, yaxis=:log, label="Diff. ERM vs Taylor : slope=$(slope)")
+    plot!(d_range, erm_gamp_difference_norm, label="Diff. ERM vs GAMP refit : slope=$(slope_erm)")
     plot!(d_range, ΔŴ_erm_norm, label="diff. before and after δy : slope=$(slope_erm)")
     display(pl)
 
@@ -264,9 +276,9 @@ end
 # test_gamp_order_one()
    
 λ = 1.0
-α = 2.0
+α = 0.5
 
 # TODO : Do profiling to see where we waste the most time in the computation
 # test_gamp_order_one_wrt_d( ConformalAmp.Lasso(α = α, λ = λ, Δ = 1.0, Δ̂ = 1.0), 100:100:2000, δy = 0.2, rng_num = 0, avg_num = 5,  var="v̂")
 
-test_gamp_order_one_loo_wrt_d( ConformalAmp.Lasso(α = α, λ = λ, Δ = 1.0, Δ̂ = 1.0), 100:50:600; rng_num = 10)
+test_gamp_order_one_loo_wrt_d( ConformalAmp.Lasso(α = α, λ = λ, Δ = 1.0, Δ̂ = 1.0), 100:50:750; rng_num = 10, δy = 1.0)

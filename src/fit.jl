@@ -35,6 +35,19 @@ function fit(problem::Logistic, X::AbstractMatrix, y::AbstractVector, ::ERM)
     return w
 end
 
+
+function fit(problem::Pinball, X::AbstractMatrix, y::AbstractVector, ::ERM)
+    """
+    https://juliaai.github.io/MLJLinearModels.jl/dev/api/#MLJLinearModels.QuantileRegression
+    """
+    model = MLJLinearModels.QuantileRegression(
+        problem.q, problem.λ; fit_intercept = false, scale_penalty_with_samples = false
+    )
+    return  MLJLinearModels.fit(model, X, y)
+end
+
+## 
+
 function fit(problem::Problem, X::AbstractMatrix, y::AbstractVector, method::GAMP)
     (; max_iter, rtol) = method
     return gamp(problem, X, y; max_iter=max_iter, rtol=rtol).x̂

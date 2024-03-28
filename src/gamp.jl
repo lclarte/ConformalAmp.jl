@@ -60,35 +60,40 @@ function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, ::Log
     return LogisticChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol)
 end
 
-function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::RegressionProblem; rtol = 1e-3)
+function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Union{Lasso, Ridge}; rtol = 1e-3)
     # use Δ̂ as it's the factor used by the student
     return RidgeChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, Δ = problem.Δ̂)
 end
 
+function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Pinball; rtol = 1e-3)
+    # use Δ̂ as it's the factor used by the student
+    return PinballChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, q = problem.q)
+end
+
 # 
 
-function ∂ωchannel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::RegressionProblem; rtol = 1e-3)
+function ∂ωchannel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Union{Lasso, Ridge}; rtol = 1e-3)
     # use Δ̂ as it's the factor used by the student
     return RidgeChannel.∂ωgₒᵤₜ_and_∂ω∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, Δ = problem.Δ̂)
 end
 
-function ∂ychannel(y::Real, ω::Real, V::Real, problem::RegressionProblem; rtol = 1e-3)
+function ∂ychannel(y::Real, ω::Real, V::Real, problem::Union{Lasso, Ridge}; rtol = 1e-3)
     # use Δ̂ as it's the factor used by the student
     return RidgeChannel.∂ygₒᵤₜ_and_∂y∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, Δ = problem.Δ̂)
 end
 
-function prior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic})
+function prior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic, Pinball})
     """
-    Only works for Gaussian 
+    For L2 penalty
     """
     (; λ) = problem
 
-    return (b ./ A) ./ (λ ./ A .+ 1.0), (1. ./ A) ./ (λ ./ A .+ 1.0)
+    return b ./ (λ .+ A), 1. ./ (λ .+ A)
 end
 
 function prior(b::AbstractVector, A::AbstractVector, problem::Lasso)
     """
-    Only works for Gaussian 
+    for l1 penalty
     """
     (; λ) = problem
 

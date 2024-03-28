@@ -31,7 +31,7 @@ function sample_labels(rng::AbstractRNG, ::Logistic, X::AbstractMatrix, w::Abstr
     return y
 end
 
-function sample_labels(rng::AbstractRNG, problem::Union{Lasso, Ridge}, X::AbstractMatrix, w::AbstractVector;)
+function sample_labels(rng::AbstractRNG, problem::RegressionProblem, X::AbstractMatrix, w::AbstractVector;)
     n = size(X, 1)
     y = X * w .+ sqrt.(problem.Δ) .* randn(rng, n)
     return y

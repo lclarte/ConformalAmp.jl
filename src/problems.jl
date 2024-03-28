@@ -28,13 +28,3 @@ end
     λ::Float64
     α::Float64
 end
-
-@kwdef struct Quantile <: RegressionProblem
-    """
-    See e.g https://scikit-learn.org/stable/modules/model_evaluation.html#pinball-loss
-    """
-    quantile::Float64
-    Δ::Float64
-    α::Float64
-    λ::Float64
-end
