@@ -364,6 +364,35 @@ function plot_histogram_weights_label_change_wrt_d(problem::ConformalAmp.Regress
     display(pl)
 end
 
+function leave_one_out_residuals_erm_vs_gamp(problem::ConformalAmp.RegressionProblem, d_range::AbstractRange; rng::AbstractRNG=StableRNG(0), δy::Real = 2.0)
+    
+    gamp_method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-3)
+    
+    for d in ProgressBar(d_range)
+        n = ConformalAmp.get_n(problem.α, d)
+        (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+        ỹ = copy(y)
+        ỹ[n] = y[n] + δy
+        # Pour ERM(), on calcule directement le LOO avec ỹ puisqu'on sait que GAMP approxime 
+        # correctement le LOO
+        debut_erm = time()
+        Ŵ_erm  = ConformalAmp.fit_leave_one_out(problem, X, ỹ, ConformalAmp.ERM())
+        Δtime_erm = time() - debut_erm
+
+        debut_gamp = time()
+        result_gamp  = ConformalAmp.gamp(problem, X, y; gamp_method.max_iter, gamp_method.rtol)
+        small_δy     = 0.1
+        Δresult_gamp = (δy / small_δy) * ConformalAmp.compute_order_one_perturbation_gamp(problem, X, y, result_gamp; gamp_method.max_iter, gamp_method.rtol, δy = small_δy)
+        Ŵ_gamp       = ConformalAmp.get_cavity_means_order_one(problem, X, y, result_gamp, Δresult_gamp; rtol = gamp_method.rtol)
+        Δtime_gamp   = time() - debut_gamp
+        # 
+        residuals_erm  = ỹ - diag(ConformalAmp.predict(problem, Ŵ_erm, X))
+        residuals_gamp = ỹ - diag(ConformalAmp.predict(problem, Ŵ_gamp, X))
+
+        plt = scatter(residuals_erm, residuals_gamp, title="d = $d, time ERM = $Δtime_erm, time GAMP = $Δtime_gamp")
+        display(plt)
+    end
+end
 
 # ========== functions calls 
 
@@ -375,7 +404,13 @@ d = 2000
 seed = 10
 
 # plot_residuals_wrt_last_label(ConformalAmp.Ridge(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), d,  rng = StableRNG(seed), δy = 5.0)
+
 # plot_residuals_wrt_last_label_single_samples(ConformalAmp.Ridge(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), d, rng = StableRNG(seed), δy_step = 1.0, δy_max = 5.0, run_erm = false)
 
-plot_label_change_wrt_d(ConformalAmp.Lasso(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), Vector{Int}(1000:100:5000), 5.0; rng = StableRNG(20))
+# plot_label_change_wrt_d(ConformalAmp.Lasso(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), Vector{Int}(1000:100:5000), 5.0; rng = StableRNG(20))
+
 # plot_histogram_weights_label_change_wrt_d(ConformalAmp.Ridge(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), Vector{Int}(500:500:2000), 5.0)
+
+problem = ConformalAmp.Lasso(α = 0.5, Δ = 1e-3, λ = λ, Δ̂ = 1.0)
+d_range = 500:100:500
+leave_one_out_residuals_erm_vs_gamp(problem, d_range; δy = 2.0)

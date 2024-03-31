@@ -1,7 +1,8 @@
 abstract type Problem end
 abstract type RegressionProblem <: Problem end
+abstract type ClassificationProblem <: Problem end
 
-@kwdef struct Logistic <: Problem
+@kwdef struct Logistic <: ClassificationProblem
     λ::Float64
     α::Float64
 end

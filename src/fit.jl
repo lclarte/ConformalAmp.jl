@@ -5,7 +5,18 @@ abstract type Method end
     rtol::Float64
 end
 
+@kwdef struct GAMPTaylor <: Method
+    # perturbation of last sample used to compute 1st derivative
+    # different from thep δy such that ỹ[n] = y[n] + δy  
+    max_iter::Integer
+    rtol::Float64
+    δy_perturbation::Float64 = 0.1
+end
+
 @kwdef struct ERM <: Method
+end
+
+@kwdef struct ERMTaylor <: Method
 end
 
 ### 
@@ -71,7 +82,7 @@ end
 
 ## TODO : Regrouper dans les memes fonctions  
 
-function predict(::Union{Ridge, Lasso}, ŵ::AbstractVector, X::AbstractMatrix)
+function predict(::RegressionProblem, ŵ::AbstractVector, X::AbstractMatrix)
     return X * ŵ
 end
 
@@ -80,7 +91,7 @@ function predict(::Logistic, ŵ::AbstractVector, X::AbstractMatrix)
 end
 
 
-function predict(::Union{Ridge, Lasso}, ŵ::AbstractMatrix, X::AbstractMatrix)
+function predict(::RegressionProblem, ŵ::AbstractMatrix, X::AbstractMatrix)
     # ŵ can be a matrix to accomodate the cavities
     return X * ŵ'
 end
@@ -89,7 +100,7 @@ function predict(::Logistic, ŵ::AbstractMatrix, X::AbstractMatrix)
     return sign.(X * ŵ')
 end
 
-function predict(::Union{Ridge, Lasso}, ŵ::AbstractMatrix, x::AbstractVector)
+function predict(::RegressionProblem, ŵ::AbstractMatrix, x::AbstractVector)
     # ŵ can be a matrix to accomodate the cavities
     return  ŵ * x
 end

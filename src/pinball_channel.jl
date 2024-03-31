@@ -18,29 +18,6 @@ module PinballChannel
     end
 
     function gₒᵤₜ_and_∂ωgₒᵤₜ(y::Real, ω::Real, V::Real; q::Real, rtol::Real = 1e-3)
-        """
-        objective(z::Real)   = abs2(z - ω) / (2V) +  loss(y, z, q)
-        gradient(_, z::Real) = (z - ω) / V +  loss_der(y, z, q)
-        hessian(_, z::Real) = inv(V)
-
-        scalarobj = NLSolvers.ScalarObjective(; f=objective, g=gradient, h=hessian)
-        optprob = NLSolvers.OptimizationProblem(scalarobj; inplace=false)
-        
-        init = ω
-        solver = NLSolvers.LineSearch(NLSolvers.Newton())
-        options = NLSolvers.OptimizationOptions(; x_reltol=rtol, x_abstol=0.0)
-        res = NLSolvers.solve(optprob, init, solver, options)
-
-        prox = res.info.solution
-        # Since the loss is affine by part, the second derivative of the loss is 0 almost everywhere 
-        # and ∂ωprox = 1.0 and ∂ωgₒᵤₜ = 0 ? 
-        # ∂ωprox = inv(1 + V * logistic_loss_der2(y, prox)) 
-        # ∂ωgₒᵤₜ = (∂ωprox - 1) / V
-
-        gₒᵤₜ = (prox - ω) / V
-        ∂ωgₒᵤₜ = 0.0
-        return gₒᵤₜ, ∂ωgₒᵤₜ
-        """
         prox = y
         if ω > y - (q - 1) * V
             prox = ω + (q - 1) * V
@@ -78,9 +55,11 @@ module PinballChannel
         NOTE : Weird that the 1st and 2nd derivatives are 0 ... 
         """
         @assert length(y) == length(ω) == length(V)
-        ∂ωg   = 0.0
-        ∂ω∂ωg = 0.0
-        return ∂ωg, ∂ω∂ωg
+        ∂ωgₒᵤₜ, ∂ω∂ωgₒᵤₜ = zeros(length(y)), zeros(length(y))
+        for i in eachindex(y)
+            _, ∂ωgₒᵤₜ[i] = gₒᵤₜ_and_∂ωgₒᵤₜ(y[i], ω[i], V[i]; q = q, rtol = rtol)
+        end
+        return ∂ωgₒᵤₜ, ∂ω∂ωgₒᵤₜ
     end
 
     ## 
@@ -96,6 +75,7 @@ module PinballChannel
         return ∂yg, ∂y∂ωg
     end
 
+    # this function is normally useless 
     function Z₀_and_∂μZ₀(y::Real, ω::Real, v::Real; rtol::Real)
         """
         Corresponds to the partition function of the Gaussian teacher 
