@@ -97,4 +97,33 @@ function plot_prox_pinball_y_range()
     display(plt)   
 end
 
-plot_prox_pinball_y_range()
+function plot_gout_pinball_y_range()
+    ω = 2.0
+    y_range = -10.0:0.1:10.0
+    x_range = copy(y_range)
+    V = 2.0
+    q = 0.9
+
+    gout_list = []
+    gout_list_2 = []
+    
+    for y in y_range
+        f_x = [abs2(x - ω) / 2V + ConformalAmp.PinballChannel.loss(y, x, q) for x in x_range]
+        x_min = x_range[argmin(f_x)]
+        push!(gout_list, ( x_min - ω) / V)
+
+        prox = y
+        if ω > y - (q - 1) * V
+            prox = ω + (q - 1) * V
+        elseif ω < y - q * V
+            prox = ω + q * V
+        end
+        push!(gout_list_2, (prox - ω) / V)
+    end
+
+    plt = plot(y_range, gout_list, label="gout")
+    plot!(y_range, gout_list_2, label="gout 2")
+    display(plt)   
+end
+
+plot_gout_pinball_y_range()

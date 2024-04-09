@@ -109,7 +109,8 @@ function predict(::Logistic, ŵ::AbstractMatrix, x::AbstractVector)
     return sign.(ŵ * x)
 end
 
-function predict(::Union{Ridge, Lasso}, ŵ::AbstractVector, x::AbstractVector)
+# function predict(::Union{Ridge, Lasso}, ŵ::AbstractVector, x::AbstractVector)
+function predict(::RegressionProblem, ŵ::AbstractVector, x::AbstractVector)
     # ŵ can be a matrix to accomodate the cavities
     return  ŵ'x
 end

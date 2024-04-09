@@ -67,7 +67,7 @@ end
 
 function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Pinball; rtol = 1e-3)
     # use Δ̂ as it's the factor used by the student
-    return PinballChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, q = problem.q)
+    return PinballChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; q = problem.q)
 end
 
 # 
@@ -77,9 +77,19 @@ function ∂ωchannel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, 
     return RidgeChannel.∂ωgₒᵤₜ_and_∂ω∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, Δ = problem.Δ̂)
 end
 
+function ∂ωchannel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Pinball; rtol = 1e-3)
+    # use Δ̂ as it's the factor used by the student
+    return PinballChannel.∂ωgₒᵤₜ_and_∂ω∂ωgₒᵤₜ(y, ω, V ; q = problem.q)
+end
+
 function ∂ychannel(y::Real, ω::Real, V::Real, problem::Union{Lasso, Ridge}; rtol = 1e-3)
     # use Δ̂ as it's the factor used by the student
     return RidgeChannel.∂ygₒᵤₜ_and_∂y∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, Δ = problem.Δ̂)
+end
+
+function ∂ychannel(y::Real, ω::Real, V::Real, problem::Pinball; rtol = 1e-3)
+    # use Δ̂ as it's the factor used by the student
+    return PinballChannel.∂ygₒᵤₜ_and_∂y∂ωgₒᵤₜ(y, ω, V; q = problem.q)
 end
 
 function prior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic, Pinball})
@@ -120,13 +130,13 @@ end
 
 ## derivatives of the prior for regression problem, useful for 
 
-function ∂bprior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic})
+function ∂bprior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic, Pinball})
     (; λ) = problem
 
     return (1 ./ A) ./ (λ ./ A .+ 1.0), zeros(size(b))
 end
 
-function ∂Aprior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic})
+function ∂Aprior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic, Pinball})
     (; λ) = problem
 
     return - b ./ (λ .+ A).^2., - 1.0 ./ (λ .+ A).^2.
