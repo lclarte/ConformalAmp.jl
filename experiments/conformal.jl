@@ -49,6 +49,8 @@ function compare_jacknife_fcp_confidence_intervals()
     println("FCP : ", minimum(fcp_confidence_set), " ", maximum(fcp_confidence_set)) 
 end
 
+#### 
+
 function compare_intervals_fcp_erm_gamptaylor(problem::ConformalAmp.Problem; d::Integer = 100, ntest::Integer = 10)
     """
     Compare the confidence interval given by ERM() so by refitting everything and GAMPTaylor for a
@@ -63,7 +65,7 @@ function compare_intervals_fcp_erm_gamptaylor(problem::ConformalAmp.Problem; d::
 
     jaccard_list_erm_amptaylor = []
     jaccard_list_erm_amp       = []
-    jaccard_list_erm_ermtaylor = []
+    jaccard_list_erm_ermrefit = []
 
     for i in ProgressBar(1:ntest)
         xtest = xtest_array[i, :]
@@ -72,12 +74,37 @@ function compare_intervals_fcp_erm_gamptaylor(problem::ConformalAmp.Problem; d::
                                 ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-3, δy_perturbation = 0.1))
         ci_amp = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo,     
                                 ConformalAmp.GAMP(max_iter = 100, rtol = 1e-3))
-        ci_ermtaylor = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo, ConformalAmp.ERMTaylor())
+        ci_ermrefit = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo, ConformalAmp.ERMTaylor())
         push!(jaccard_list_erm_amptaylor, jaccard_index(minimum(ci_erm), maximum(ci_erm), minimum(ci_amptaylor), maximum(ci_amptaylor)) )
         push!(jaccard_list_erm_amp, jaccard_index(minimum(ci_erm), maximum(ci_erm), minimum(ci_amp), maximum(ci_amp)) )
-        push!(jaccard_list_erm_ermtaylor, jaccard_index(minimum(ci_erm), maximum(ci_erm), minimum(ci_ermtaylor), maximum(ci_ermtaylor)) )
+        push!(jaccard_list_erm_ermrefit, jaccard_index(minimum(ci_erm), maximum(ci_erm), minimum(ci_ermrefit), maximum(ci_ermrefit)) )
     end
-    return (jaccard_list_erm_amptaylor, jaccard_list_erm_amp, jaccard_list_erm_ermtaylor)
+    return (jaccard_list_erm_amptaylor, jaccard_list_erm_amp, jaccard_list_erm_ermrefit)
+end
+
+function compare_length_fcp_erm_gamptaylor(problem::ConformalAmp.Problem; d::Integer = 100, ntest::Integer = 10)
+    """
+    Compare the sizes of the confidence intervals given by the different algos 
+    """
+    rng = StableRNG(51)
+
+    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+    xtest_array = ConformalAmp.sample_data_any_n(rng, d, ntest)
+
+    algo = ConformalAmp.FullConformal(δy_range = -5.0:0.2:5.0, coverage = 0.9)
+
+    length_erm = []
+    length_amptaylor = []
+
+    for i in ProgressBar(1:ntest)
+        xtest = xtest_array[i, :]
+        ci_erm = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo, ConformalAmp.ERM())
+        ci_amptaylor = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo,     
+                                ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-3, δy_perturbation = 0.1))
+        push!(length_erm, maximum(ci_erm) - minimum(ci_erm))
+        push!(length_amptaylor, maximum(ci_amptaylor) - minimum(ci_amptaylor))
+    end
+    return (length_erm, length_amptaylor)
 end
 
 ## 
@@ -108,45 +135,77 @@ function compute_coverage_gamp_taylor(problem::ConformalAmp.Problem; d::Integer 
     return total_covered / ntest
 end
 
-#####
+##### EXPERIMENTS
 
+function experiment_jaccard()
+    """
+    Compute the jaccard index between confidence intervals of ERM and other methods 
+    """
+    d = 100
+    problem = ConformalAmp.Ridge(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
+    # problem = ConformalAmp.Pinball(α = 0.5, λ = 1e-1, Δ = 1.0, q = 0.9)
+    
+    @time jaccard_list_erm_amptaylor, jaccard_list_erm_amp, jaccard_list_erm_ermrefit = compare_intervals_fcp_erm_gamptaylor(problem; d = d, ntest=20)
+    
+    plt = stephist(jaccard_list_erm_amptaylor, bins=0.0:0.01:1.01, density=true, title="$(problem), d = $d",
+        label="Gamp taylor : mean $(round(mean(jaccard_list_erm_amptaylor), sigdigits=2))", )
+    stephist!(jaccard_list_erm_amp, bins=0.0:0.01:1.01, density=true, 
+        label="Gamp refit : mean = $(round(mean(jaccard_list_erm_amp), sigdigits=2))")
+    stephist!(jaccard_list_erm_ermrefit, bins=0.0:0.01:1.01, density=true,
+        label="Erm refit : mean = $(round(mean(jaccard_list_erm_ermrefit), sigdigits=2))")
 
-"""
-problem = ConformalAmp.Ridge(α = 2.0, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
-# problem = ConformalAmp.Pinball(α = 0.5, λ = 1e-1, Δ = 1.0, q = 0.9)
-
-@time jaccard_list_erm_amptaylor, jaccard_list_erm_amp, jaccard_list_erm_ermtaylor = compare_intervals_fcp_erm_gamptaylor(problem; d = d, ntest=20)
-
-plt = stephist(jaccard_list_erm_amptaylor, bins=0.0:0.01:1.01, density=true, title="$(problem), d = $d",
-    label="Gamp taylor : mean $(round(mean(jaccard_list_erm_amptaylor), sigdigits=2))", )
-stephist!(jaccard_list_erm_amp, bins=0.0:0.01:1.01, density=true, 
-    label="Gamp refit : mean = $(round(mean(jaccard_list_erm_amp), sigdigits=2))")
-stephist!(jaccard_list_erm_ermtaylor, bins=0.0:0.01:1.01, density=true,
-    label="Erm refit : mean = $(round(mean(jaccard_list_erm_ermtaylor), sigdigits=2))")
-
-println("Mean jaccard index for ERM vs GAMP Taylor : ", mean(jaccard_list_erm_amptaylor))
-println("Mean jaccard index for ERM vs GAMP refit  : ", mean(jaccard_list_erm_amp))
-println("Mean jaccard index for ERM vs ERM Taylor : ", mean(jaccard_list_erm_ermtaylor))
-display(plt)
-# save the plot
-savefig(plt, "plots/jaccard_$(problem).png")
-"""
-
-mean_coverages = []
-d_list = 50:10:200
-problem = ConformalAmp.Ridge(α = 0.5, λ = 1e-1, Δ = 1.0, Δ̂ = 1.0)
-
-for d in ProgressBar(d_list)
-    coverages = []
-    for seed in 1:25
-        c = compute_coverage_gamp_taylor(problem; d = d, ntest = 100, rng_seed = seed)
-        push!(coverages, c)
-    end
-
-    push!(mean_coverages, mean(coverages))
+    display(plt)
+    # save the plot
+    savefig(plt, "plots/jaccard_$(problem).png")
 end
 
-scatter(d_list, mean_coverages, label="GAMP Taylor", xaxis="d", yaxis="coverage", title="$(problem)")
-# draw black line at y = 0.9
-plot!(d_list, 0.9 * ones(length(d_list)), label="0.9", color=:black)
-savefig("plots/coverage_gamp_taylor_$(problem).png")
+function experiment_length()
+    """
+    Compare the lengthes of the confidence intervals 
+    """
+    d = 50
+    problem = ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
+    
+    length_erm, length_amptaylor = compare_length_fcp_erm_gamptaylor(problem; d = d, ntest=100)
+
+    min_bound = minimum([minimum(length_erm), minimum(length_amptaylor)])
+    max_bound = maximum([maximum(length_erm), maximum(length_amptaylor)])
+    step      = (max_bound - min_bound) / 50
+    
+    # plt = stephist(length_erm, bins=min_bound:step:max_bound, density=true, title="$(problem), d = $d",
+    #     label="Erm : mean $(round(mean(length_erm), sigdigits=2))")
+    # stephist!(length_amptaylor, bins=min_bound:step:max_bound, density=true, label="Amptaylor : mean $(round(mean(length_amptaylor), sigdigits=2))")
+    
+    plt = scatter(length_erm, length_amptaylor, title="$(problem), d = $d", label="Erm vs Amptaylor", xaxis="ERM length", yaxis="AMP Taylor length")
+    # scatter the mean of both 
+    scatter!([mean(length_erm)], [mean(length_amptaylor)], label="mean", color=:red)
+    # plot the diagonal
+    plot!(plt, min_bound:step:max_bound, min_bound:step:max_bound, label="", color=:black)
+
+    display(plt)
+    # save the plot
+    savefig(plt, "plots/length_$(problem).png")
+end
+
+function experiment_coverage()
+    mean_coverages = []
+    d_list = 50:10:200
+    problem = ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
+    
+    for d in ProgressBar(d_list)
+        coverages = []
+        for seed in 1:25
+            c = compute_coverage_gamp_taylor(problem; d = d, ntest = 100, rng_seed = seed)
+            push!(coverages, c)
+        end
+    
+        push!(mean_coverages, mean(coverages))
+    end
+    
+    scatter(d_list, mean_coverages, label="GAMP Taylor", xaxis="d", yaxis="coverage", title="$(problem)")
+    # draw black line at y = 0.9
+    plot!(d_list, 0.9 * ones(length(d_list)), label="0.9", color=:black)
+    savefig("plots/coverage_gamp_taylor_$(problem).png")
+end
+
+experiment_coverage()
