@@ -23,6 +23,7 @@ end
     q::Float64 # to estimate quantile q
     λ::Float64
     α::Float64
+    use_bias::Bool = false
 end
 
 @kwdef struct Lasso <: RegressionProblem

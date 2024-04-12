@@ -97,7 +97,7 @@ function plot_prox_pinball_y_range()
     display(plt)   
 end
 
-function plot_gout_pinball_y_range()
+function plot_gout_pinball_y_range(bias::Real = 0.0)
     ω = 2.0
     y_range = -10.0:0.1:10.0
     x_range = copy(y_range)
@@ -108,14 +108,14 @@ function plot_gout_pinball_y_range()
     gout_list_2 = []
     
     for y in y_range
-        f_x = [abs2(x - ω) / 2V + ConformalAmp.PinballChannel.loss(y, x, q) for x in x_range]
+        f_x = [abs2(x - ω) / 2V + ConformalAmp.PinballChannel.loss(y, x + bias, q) for x in x_range]
         x_min = x_range[argmin(f_x)]
-        push!(gout_list, ( x_min - ω) / V)
-
-        prox = y
-        if ω > y - (q - 1) * V
+        push!(gout_list, (x_min - ω) / V)
+        
+        prox = y - bias
+        if ω > y - bias - (q - 1) * V
             prox = ω + (q - 1) * V
-        elseif ω < y - q * V
+        elseif ω < (y - bias) - q * V
             prox = ω + q * V
         end
         push!(gout_list_2, (prox - ω) / V)
@@ -123,7 +123,23 @@ function plot_gout_pinball_y_range()
 
     plt = plot(y_range, gout_list, label="gout")
     plot!(y_range, gout_list_2, label="gout 2")
-    display(plt)   
+    display(plt)
 end
 
-plot_gout_pinball_y_range()
+function compare_erm_gamp_pinball_bias()
+    """
+    Compare the result of GAMP and ERM when we add a Bias
+    """
+    d = 10
+    rng = StableRNG(0)
+    problem = ConformalAmp.Pinball(λ = 1.0, α = 3.0, Δ = 1.0, q = 0.5, use_bias = true)
+    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+
+    result = ConformalAmp.fit(problem, X, y, ConformalAmp.ERM())
+    ŵ, b̂   = result[1:d], result[d+1]
+    
+    result_gamp = ConformalAmp.gamp(problem, X, y; max_iter = 20)
+    println(" GAMP bias = $(result_gamp.bias), ERM b̂ = $b̂")
+end
+
+compare_erm_gamp_pinball_bias()

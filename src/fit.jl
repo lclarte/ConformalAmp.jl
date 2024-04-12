@@ -50,11 +50,12 @@ end
 function fit(problem::Pinball, X::AbstractMatrix, y::AbstractVector, ::ERM)
     """
     https://juliaai.github.io/MLJLinearModels.jl/dev/api/#MLJLinearModels.QuantileRegression
+    with an intercept, the intercept is the LAST ELEMENT OF THE VECTOR RETURNED
     """
     model = MLJLinearModels.QuantileRegression(
-        problem.q, problem.λ; fit_intercept = false, scale_penalty_with_samples = false
+        problem.q, problem.λ; fit_intercept = problem.use_bias, scale_penalty_with_samples = false, penalize_intercept = false
     )
-    return  MLJLinearModels.fit(model, X, y)
+    return MLJLinearModels.fit(model, X, y)
 end
 
 ## 
@@ -82,8 +83,9 @@ end
 
 ## TODO : Regrouper dans les memes fonctions  
 
-function predict(::RegressionProblem, ŵ::AbstractVector, X::AbstractMatrix)
-    return X * ŵ
+function predict(::RegressionProblem, ŵ::AbstractVector, X::AbstractMatrix; bias::Real = 0.0)
+    # add the same bias since we have only one predictor
+    return X * ŵ .+ bias
 end
 
 function predict(::Logistic, ŵ::AbstractVector, X::AbstractMatrix)
@@ -91,18 +93,28 @@ function predict(::Logistic, ŵ::AbstractVector, X::AbstractMatrix)
 end
 
 
-function predict(::RegressionProblem, ŵ::AbstractMatrix, X::AbstractMatrix)
+function predict(::RegressionProblem, ŵ::AbstractMatrix, X::AbstractMatrix; bias::AbstractVector = nothing)
+    """
+    If we have a k x d matrix ŵ, we return a n x k matrix
+    """
     # ŵ can be a matrix to accomodate the cavities
-    return X * ŵ'
+    if isnothing(bias)
+        return X * ŵ'
+    else
+        @assert length(bias) == size(ŵ, 1)
+        # stach the bias horzizontally n times
+        # when bias is a k-dimensional vector
+        return X * ŵ' + vcat([bias' for i in 1:size(X, 1)])
+    end
 end
 
 function predict(::Logistic, ŵ::AbstractMatrix, X::AbstractMatrix)
     return sign.(X * ŵ')
 end
 
-function predict(::RegressionProblem, ŵ::AbstractMatrix, x::AbstractVector)
+function predict(::RegressionProblem, ŵ::AbstractMatrix, x::AbstractVector; bias::Real = 0.0)
     # ŵ can be a matrix to accomodate the cavities
-    return  ŵ * x
+    return  ŵ * x + bias
 end
 
 function predict(::Logistic, ŵ::AbstractMatrix, x::AbstractVector)

@@ -4,6 +4,9 @@ Contains the code to run the BayesOpt estimator for logistic regression
 
 import Base: -, +, *
 
+# TODO : Write GampResult with a template for the problem type
+# so that we can have the bias or not 
+
 @kwdef struct GampResult 
     x̂::AbstractVector
     v̂::AbstractVector
@@ -13,8 +16,8 @@ import Base: -, +, *
     b::AbstractVector
     g::AbstractVector
     dg::AbstractVector
+    bias::Real = nothing
 end
-
 
 function Base.:+(res1::GampResult, res2::GampResult)
     return GampResult(
@@ -56,18 +59,18 @@ end
 
 ## 
 
-function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, ::Logistic; rtol = 1e-3)
+function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, ::Logistic; rtol = 1e-3)::Tuple{AbstractVector, AbstractVector}
     return LogisticChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol)
 end
 
-function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Union{Lasso, Ridge}; rtol = 1e-3)
+function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Union{Lasso, Ridge}; rtol = 1e-3)::Tuple{AbstractVector, AbstractVector}
     # use Δ̂ as it's the factor used by the student
     return RidgeChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, Δ = problem.Δ̂)
 end
 
-function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Pinball; rtol = 1e-3)
+function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Pinball; rtol::Real = 1e-3, b::Real = 0.0)::Tuple{AbstractVector, AbstractVector}
     # use Δ̂ as it's the factor used by the student
-    return PinballChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; q = problem.q)
+    return PinballChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; q = problem.q, bias = b)
 end
 
 # 
@@ -223,6 +226,69 @@ function gamp(problem::Problem, X::AbstractMatrix, y::AbstractVector; max_iter::
     # return (; xhat, vhat, ω)
     return GampResult(x̂ = xhat, v̂ = vhat, ω = ω, V = V, A = A, b = b, g = g, dg = dg)
 end
+
+function gamp(problem::Pinball, X::AbstractMatrix, y::AbstractVector; max_iter::Integer = 100, rtol::Real = 1e-3)
+    """
+    Modification of GAMP to integrate a bias term in the problem
+    QUESTION : Can we derive state evolution equations from this ? Maybe not 
+    """
+
+    (; λ) = problem
+    n, d = size(X)
+    X_squared = X .* X
+
+    xhat = zeros(d)
+    vhat = ones(d)
+    xhat_old = zeros(d)
+    
+    g  = zeros(n)
+    dg = zeros(n)
+    
+    V = zeros(n)
+    ω = zeros(n)
+
+    A = zeros(d)
+    b = zeros(d)
+
+    bias = 0.0
+
+    for iteration in 1:max_iter
+        xhat_old_outer = copy(xhat)
+        for iteration in 1:max_iter
+            V = X_squared * vhat
+
+            ω = X * xhat - V .* g
+            g, dg = channel(y, ω, V, problem, rtol=rtol, b = bias)
+
+            A = - X_squared' * dg
+            b = A .* xhat + X' * g
+            
+            xhat_old = copy(xhat)
+            xhat, vhat = prior(b, A, problem)
+
+            if norm(xhat - xhat_old) / norm(xhat) < rtol
+                break
+            end
+        end
+
+        # update the bias AFTER convergence of the AMP iterations
+        if problem.use_bias
+            # update the bias here, it's equal to the q-th quantile of the training residuals
+            bias = Statistics.quantile(y - X * xhat, problem.q)
+        else
+            bias = 0.0
+        end
+
+        if norm(xhat - xhat_old_outer) / norm(xhat) < rtol
+            break
+        end
+    end
+
+    # return (; xhat, vhat, ω)
+    return GampResult(x̂ = xhat, v̂ = vhat, ω = ω, V = V, A = A, b = b, g = g, dg = dg, bias = bias)
+end
+
+##
 
 function compute_order_one_perturbation_gamp(problem::RegressionProblem, X::AbstractMatrix, y::AbstractVector, result::GampResult; max_iter::Integer = 10, rtol::Real = 1e-3, δy::Real = 1.0)
     """
