@@ -3,6 +3,7 @@ Script pour tester la pinball loss et verifier que ca fait bien de la quantile r
 """
 
 using ConformalAmp
+using Distributions
 using LinearAlgebra
 using Plots
 using ProgressBars
@@ -130,16 +131,30 @@ function compare_erm_gamp_pinball_bias()
     """
     Compare the result of GAMP and ERM when we add a Bias
     """
-    d = 10
+    d = 500
     rng = StableRNG(0)
-    problem = ConformalAmp.Pinball(λ = 1.0, α = 3.0, Δ = 1.0, q = 0.5, use_bias = true)
-    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+    quantile = 0.75
+    α_range = 0.2:0.2:3.0
 
-    result = ConformalAmp.fit(problem, X, y, ConformalAmp.ERM())
-    ŵ, b̂   = result[1:d], result[d+1]
-    
-    result_gamp = ConformalAmp.gamp(problem, X, y; max_iter = 20)
-    println(" GAMP bias = $(result_gamp.bias), ERM b̂ = $b̂")
+    println("Quantile of normal at $quantile is $(Distributions.quantile(Normal(), quantile))")
+
+    biases_gamp, biases_erm = [], []
+
+    for α in α_range
+        problem = ConformalAmp.Pinball(λ = 1e-2, α = α, Δ = 1.0, q = quantile, use_bias = true)
+        (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+
+        result = ConformalAmp.fit(problem, X, y, ConformalAmp.ERM())
+        ŵ, b̂   = result[1:d], result[d+1]
+
+        push!(biases_erm, b̂)
+        result_gamp = ConformalAmp.gamp(problem, X, y; max_iter = 100)
+        push!(biases_gamp, result_gamp.bias)
+    end
+
+    plot(α_range, biases_erm, label="ERM", xaxis="α", yaxis="Bias")
+    plot!(α_range, biases_gamp, label="GAMP")
+
 end
 
 compare_erm_gamp_pinball_bias()

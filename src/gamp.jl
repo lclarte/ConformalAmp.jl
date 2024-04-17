@@ -2,6 +2,8 @@
 Contains the code to run the BayesOpt estimator for logistic regression
 """
 
+using SpecialFunctions
+
 import Base: -, +, *
 
 # TODO : Write GampResult with a template for the problem type
@@ -16,7 +18,7 @@ import Base: -, +, *
     b::AbstractVector
     g::AbstractVector
     dg::AbstractVector
-    bias::Real = nothing
+    bias::Union{Real, Nothing} = nothing
 end
 
 function Base.:+(res1::GampResult, res2::GampResult)
@@ -63,7 +65,7 @@ function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, ::Log
     return LogisticChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol)
 end
 
-function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Union{Lasso, Ridge}; rtol = 1e-3)::Tuple{AbstractVector, AbstractVector}
+function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Union{BayesOptimalLasso, Lasso, Ridge}; rtol = 1e-3)::Tuple{AbstractVector, AbstractVector}
     # use Δ̂ as it's the factor used by the student
     return RidgeChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, Δ = problem.Δ̂)
 end
@@ -71,6 +73,10 @@ end
 function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Pinball; rtol::Real = 1e-3, b::Real = 0.0)::Tuple{AbstractVector, AbstractVector}
     # use Δ̂ as it's the factor used by the student
     return PinballChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; q = problem.q, bias = b)
+end
+
+function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, ::BayesOptimalLogistic; rtol = 1e-3)::Tuple{AbstractVector, AbstractVector}
+    return BayesianLogisticChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol)
 end
 
 # 
@@ -95,11 +101,15 @@ function ∂ychannel(y::Real, ω::Real, V::Real, problem::Pinball; rtol = 1e-3)
     return PinballChannel.∂ygₒᵤₜ_and_∂y∂ωgₒᵤₜ(y, ω, V; q = problem.q)
 end
 
-function prior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic, Pinball})
+function prior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic, Pinball, BayesOptimalLogistic, BayesOptimalRidge})
     """
     For L2 penalty
     """
     (; λ) = problem
+    # We don't need to assert that λ = 1.0, if it's not we will just not have the Bayes optimal estimator
+    # if problem isa BayesOptimalLogistic || problem isa BayesOptimalRidge
+    #     @assert λ == 1.0
+    # end
 
     return b ./ (λ .+ A), 1. ./ (λ .+ A)
 end
@@ -129,6 +139,41 @@ function prior(b::AbstractVector, A::AbstractVector, problem::Lasso)
     end
 
     return fa.(b, A), fv.(b, A)
+end
+
+function prior(b::AbstractVector, A::AbstractVector, problem::BayesOptimalLasso)
+    """
+    for l1 penalty
+    """
+    function ∂RlogZ(Σ::AbstractVector, R::AbstractVector, λ::Real)
+        # convert the Python code above in Julia
+        tmp = sqrt.(2.0 * Σ)
+        Rm, Rp = (R .- λ * Σ), (R .+ λ * Σ)
+        return - λ * (1.0 .+ erf.(Rm ./ tmp) - exp.(2 * R * λ) .* erfc.(Rp ./ tmp)) ./ (1.0 .+ erf.(Rm ./ tmp) .+ exp.(2.0 * λ * R) .* erfc.(Rp ./ tmp))
+    end
+
+    function ∂∂RlogZ(Σ::AbstractVector, R::AbstractVector, λ::Real)
+        """tmp = np.sqrt(2.0 * Sigma)
+        tmp_exp = np.exp(2 * R * lambda_)
+        tmp_pi = np.sqrt(2.0 / np.pi)
+        Rm, Rp = R - lambda_ * Sigma, R + lambda_ * Sigma
+        return 2 * lambda_ * tmp_exp * ( - np.exp(-Rp**2 / tmp**2) * tmp_pi + ( 2 * lambda_ * np.sqrt(Sigma) - tmp_pi * np.exp(-Rm**2 / tmp**2)) * erfc(Rp / tmp) + \
+                erf(Rm / tmp) * (2 * lambda_ * np.sqrt(Sigma) * erfc(Rp / tmp) - np.exp(-Rp**2 / tmp**2) * tmp_pi)) / \
+                (np.sqrt(Sigma) * (1.0 + erf(Rm / tmp) + tmp_exp * erfc(Rp / tmp) )**2)"""
+        tmp = sqrt.(2.0 * Σ)
+        tmp_exp = exp.(2 * R * λ)
+        tmp_pi = sqrt.(2.0 / π)
+        Rm, Rp = R .- λ * Σ, R .+ λ * Σ
+        return 2 * λ * tmp_exp .* ( - exp.(- Rp.^2 ./ tmp.^2) .* tmp_pi + ( 2 * λ * sqrt.(Σ) .- tmp_pi .* exp.(- Rm.^2 ./ tmp.^2)) .* erfc.(Rp ./ tmp) .+ 
+                erf.(Rm ./ tmp) .* (2 * λ * sqrt.(Σ) .* erfc.(Rp ./ tmp) .- exp.(- Rp.^2 ./ tmp.^2) .* tmp_pi)) ./ 
+                (sqrt.(Σ) .* (1.0 .+ erf.(Rm ./ tmp) .+ tmp_exp .* erfc.(Rp ./ tmp) ).^2)
+    end
+
+    Σ = 1.0 ./ A
+    R = b ./ A
+    fa = Σ .* ∂RlogZ(Σ, R, problem.λ) + R
+    fv = Σ.^2 .* ∂∂RlogZ(Σ, R, problem.λ) + Σ
+    return fa, fv
 end
 
 ## derivatives of the prior for regression problem, useful for 
@@ -183,7 +228,7 @@ function ∂Aprior(b::AbstractVector, A::AbstractVector, problem::Lasso)
     return ∂Afa.(b, A), ∂Afv.(b, A)
 end
 
-
+##
 
 ## 
 
@@ -226,6 +271,9 @@ function gamp(problem::Problem, X::AbstractMatrix, y::AbstractVector; max_iter::
     # return (; xhat, vhat, ω)
     return GampResult(x̂ = xhat, v̂ = vhat, ω = ω, V = V, A = A, b = b, g = g, dg = dg)
 end
+
+# SPECIAL IMPLEMENTATION OF GAMP FOR QUANTILE REGRESSION, BECAUSE HERE WE ADD THE BIAS.
+# For now we alternate the minimization of the bias inside the loop of GAMP (given the weights w⃗) 
 
 function gamp(problem::Pinball, X::AbstractMatrix, y::AbstractVector; max_iter::Integer = 100, rtol::Real = 1e-3)
     """
@@ -273,15 +321,20 @@ function gamp(problem::Pinball, X::AbstractMatrix, y::AbstractVector; max_iter::
 
         # update the bias AFTER convergence of the AMP iterations
         if problem.use_bias
+            bias_old = bias
             # update the bias here, it's equal to the q-th quantile of the training residuals
             bias = Statistics.quantile(y - X * xhat, problem.q)
+            if norm(xhat - xhat_old_outer) / norm(xhat) < rtol && abs(bias - bias_old) / abs(bias) < rtol
+                break
+            end
         else
             bias = 0.0
+            if norm(xhat - xhat_old_outer) / norm(xhat) < rtol
+                break
+            end
         end
 
-        if norm(xhat - xhat_old_outer) / norm(xhat) < rtol
-            break
-        end
+        
     end
 
     # return (; xhat, vhat, ω)

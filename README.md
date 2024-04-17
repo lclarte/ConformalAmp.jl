@@ -1,9 +1,17 @@
 **TODO**
 
-[ ] Ajouter le biais dans l'AMP pour le quantile regression 
-[ ] Implémenter Bayes optimal pour le LASSO et pour Ridge 
-[ ] Faire une expérience qui compare les _scores_ leave one out avec ERM et avec GAMP-Taylor : avec $d$ qui varie (le reste fixé), calculer les LOO scores pour y dans [y* - dy, y* + dy] et calculer la différence moyenne (voir faire un scatter plot)
+[x] Ajouter le biais dans l'AMP pour le quantile regression 
+
+[x] Implémenter Bayes optimal pour Logistic
+
+[ ] Implémenter Bayes optimal pour LASSO (Laplace prior) + Ridge (deja implementer normalement, juste faire les tests)
+
+[ ] Comparer intervalles de confiance donnés par FullConformal et le Bayes optimal
+
+[ ] Implémenter Split conformal prediction
+
+[ ] Implémenter Trimmed conformal prediction (1611.09933)
 
 **Comparaison à faire**
 - Split conformal prediction 
-- "Trimmed conformal prediction" 1611.09933 (pas de code disponible en ligne, demander à l'auteur)
+- "Trimmed conformal prediction"  (pas de code disponible en ligne, demander à l'auteur)

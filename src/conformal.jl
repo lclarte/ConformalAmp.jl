@@ -11,6 +11,10 @@ end
     coverage::Float64
 end
 
+@kwdef struct SplitConformal <: UncertaintyAlgorithm
+    coverage::Float64
+end
+
 # score function 
 
 function score(::Logistic, y::Real, confidence::Real)

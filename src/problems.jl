@@ -9,7 +9,12 @@ abstract type ClassificationProblem <: Problem end
     α::Float64
 end
 
-# 
+@kwdef struct BayesOptimalLogistic <: ClassificationProblem
+    α::Float64
+    λ::Float64 = 1.0 # don't need to care about 
+end
+
+# REGRESSIONS
 
 @kwdef struct Ridge <: RegressionProblem
     Δ::Float64
@@ -43,10 +48,10 @@ end
 
 # model corresponding the Laplace prior and L2 loss 
 @kwdef struct BayesOptimalLasso <: RegressionProblem
-    Δ::Float64
-    Δ̂::Float64
-    λ::Float64
     α::Float64
+    Δ::Float64 = 1.0
+    Δ̂::Float64 = 1.0
+    λ::Float64 = 1.0
 end
 
 function Base.show(io::IO, problem::Ridge) 

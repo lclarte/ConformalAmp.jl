@@ -9,6 +9,7 @@ using Statistics
 
 include("problems.jl")
 include("logistic_channel.jl")
+include("bayesian_logistic_channel.jl")
 include("ridge_channel.jl")
 include("pinball_channel.jl")
 include("gamp.jl")

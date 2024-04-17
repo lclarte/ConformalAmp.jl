@@ -53,7 +53,7 @@ function fit(problem::Pinball, X::AbstractMatrix, y::AbstractVector, ::ERM)
     with an intercept, the intercept is the LAST ELEMENT OF THE VECTOR RETURNED
     """
     model = MLJLinearModels.QuantileRegression(
-        problem.q, problem.λ; fit_intercept = problem.use_bias, scale_penalty_with_samples = false, penalize_intercept = false
+        ; delta = problem.q, lambda = problem.λ, gamma = 0.0, fit_intercept = problem.use_bias, scale_penalty_with_samples = false, penalize_intercept = false
     )
     return MLJLinearModels.fit(model, X, y)
 end

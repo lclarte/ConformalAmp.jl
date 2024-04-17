@@ -25,7 +25,7 @@ function sample_weights(rng::AbstractRNG, problem::Problem, d::Integer)
     return w .* sqrt(d) / norm(w, 2)
 end
 
-function sample_labels(rng::AbstractRNG, ::Logistic, X::AbstractMatrix, w::AbstractVector;)
+function sample_labels(rng::AbstractRNG, ::Union{Logistic, BayesOptimalLogistic}, X::AbstractMatrix, w::AbstractVector;)
     n = size(X, 1)
     y = 2. .* (rand(rng, n) .< logistic.(X * w)) .- 1.
     return y
