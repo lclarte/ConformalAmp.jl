@@ -2,6 +2,7 @@
     Script to generate the data
 """
 
+using Distributions
 using StableRNGs: AbstractRNG
 using LogExpFunctions
 
@@ -15,14 +16,19 @@ function sample_data(rng::AbstractRNG, problem::Problem, d::Integer)
 end
 
 function sample_data_any_n(rng::AbstractRNG, d::Integer, n::Integer)
-
     X = randn(rng, n, d) ./ sqrt(d)
     return X
 end
 
 function sample_weights(rng::AbstractRNG, problem::Problem, d::Integer)
-    w = randn(rng, d) 
-    return w .* sqrt(d) / norm(w, 2)
+    if problem isa BayesOptimalLasso
+        w = rand(Distributions.Laplace(0., 1.0), d)
+        # variance of the Laplace distribution is 2
+        return w .* sqrt(2 * d) / norm(w, 2)
+    else
+        w = randn(rng, d) 
+        return w .* sqrt(d) / norm(w, 2)
+    end
 end
 
 function sample_labels(rng::AbstractRNG, ::Union{Logistic, BayesOptimalLogistic}, X::AbstractMatrix, w::AbstractVector;)

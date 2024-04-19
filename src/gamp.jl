@@ -65,7 +65,7 @@ function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, ::Log
     return LogisticChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol)
 end
 
-function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Union{BayesOptimalLasso, Lasso, Ridge}; rtol = 1e-3)::Tuple{AbstractVector, AbstractVector}
+function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Union{Ridge, Lasso, BayesOptimalRidge, BayesOptimalLasso}; rtol = 1e-3)::Tuple{AbstractVector, AbstractVector}
     # use Δ̂ as it's the factor used by the student
     return RidgeChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, Δ = problem.Δ̂)
 end
@@ -81,7 +81,7 @@ end
 
 # 
 
-function ∂ωchannel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Union{Lasso, Ridge}; rtol = 1e-3)
+function ∂ωchannel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Union{Lasso, Ridge, BayesOptimalRidge, BayesOptimalLasso}; rtol = 1e-3)
     # use Δ̂ as it's the factor used by the student
     return RidgeChannel.∂ωgₒᵤₜ_and_∂ω∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, Δ = problem.Δ̂)
 end
