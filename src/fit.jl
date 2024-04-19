@@ -92,8 +92,8 @@ function predict(::Logistic, ŵ::AbstractVector, X::AbstractMatrix)
     return sign.(X * ŵ)
 end
 
-
-function predict(::RegressionProblem, ŵ::AbstractMatrix, X::AbstractMatrix; bias::AbstractVector = nothing)
+# attention au type de bias qui DOIT inclure "Nothing" pour ne pas buguer 
+function predict(::RegressionProblem, ŵ::AbstractMatrix, X::AbstractMatrix; bias::Union{AbstractVector, Nothing} = nothing)
     """
     If we have a k x d matrix ŵ, we return a n x k matrix
     """

@@ -4,12 +4,34 @@ e.g. for ridge regression or the LASSO
 TODO : Implémenter le Bayes-optimal pour le lasso, deja fait quelque part 
 """
 
-using Plots
 using ConformalAmp
+using Distributions
+using Plots
+using ProgressBars
 using StableRNGs: StableRNG
 using Statistics
 
+# Helper functions
+
+function build_problem(problem_str::String, α::Real)
+    if problem_str == "ridge"
+        problem = ConformalAmp.BayesOptimalRidge(; α = α, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
+    elseif problem_str == "lasso"
+        problem = ConformalAmp.BayesOptimalLasso(; α = α, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
+    elseif problem_str == "logistic"
+        problem = ConformalAmp.BayesOptimalLogistic(; α = α, λ = 1.0)
+    else
+        error("Unknown problem")
+    end
+    return problem
+end
+
+# Actual experiments
+
 function test(problem_str::String)
+    """
+    Test that the overlaps of the Bayes-optimal estimators are all the same 
+    """
     α_vals = 0.5:20.0
     d = 500
     rng = StableRNG(0)
@@ -17,15 +39,7 @@ function test(problem_str::String)
     q_overlaps, m_overlaps, v_overlaps = [], [], []
 
     for α in α_vals
-        if problem_str == "ridge"
-            problem = ConformalAmp.BayesOptimalRidge(; α = α, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
-        elseif problem_str == "lasso"
-            problem = ConformalAmp.BayesOptimalLasso(; α = α, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
-        elseif problem_str == "logistic"
-            problem = ConformalAmp.BayesOptimalLogistic(; α = α, λ = 1.0)
-        else
-            error("Unknown problem")
-        end
+        problem = build_problem(problem_str, α)
         (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
         result = ConformalAmp.gamp(problem, X, y; rtol=1e-4)
 
@@ -41,4 +55,72 @@ function test(problem_str::String)
     display(plt)
 end
 
-test("lasso")
+function compare_bayes_optimal_conformal_intervals(problem_str::String)
+    """
+    For a given dataaset, we do 2 things :
+        - Look at the coverage of Bayes-posterior and Full Conformal Prediction (either exact or approximated)
+        - Compare the size of the intervals
+    """
+    α = 1.0
+    rng = StableRNG(0)
+    d = 200
+
+    gamp = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4)
+    
+    coverage = 0.9
+    quantile = Distributions.quantile(Normal(), 0.5 + coverage / 2.0)
+    println("CDF between -quantile and quantile is $(cdf(Normal(), quantile) - cdf(Normal(), -quantile))")
+    fcp = ConformalAmp.FullConformal(δy_range = 0.1:0.05:4.0, coverage = coverage)
+    
+    problem = build_problem(problem_str, α)
+    erm_problem = problem_str == "ridge" ? ConformalAmp.Ridge(α = α, λ = 1.0, Δ = 1.0, Δ̂ = 1.0) : ConformalAmp.Lasso(α = α, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
+
+    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+
+    ntest = 200
+    Xtest = ConformalAmp.sample_data_any_n(rng, d, ntest)
+    ytest = ConformalAmp.sample_labels(rng, problem, Xtest, w)
+
+    ybo = []
+
+    bo_interval_size = []
+    cp_interval_size = []
+    bo_total, cp_total = 0, 0
+
+    result = ConformalAmp.gamp(problem, X, y; rtol=1e-4)
+    
+
+    for i in ProgressBar(1:ntest)
+    # compute the confidence interval for the Bayes-optimal estimator
+        xtest = Xtest[i, :]
+        
+        # the prediction is a Gaussian, for α coverage, we take the quantile of the Gaussian
+        bo_interval = [result.x̂' * xtest - sqrt(result.v̂' * (xtest.^2)) * quantile, result.x̂' * xtest + sqrt(result.v̂' * (xtest.^2)) * quantile]
+        push!(bo_interval_size, maximum(bo_interval) - minimum(bo_interval))
+        if minimum(bo_interval) <= ytest[i] <= maximum(bo_interval)
+            bo_total += 1
+        end
+
+        cp_interval = ConformalAmp.get_confidence_interval(erm_problem, X, y, xtest, fcp, gamp)
+        push!(cp_interval_size, maximum(cp_interval) - minimum(cp_interval))
+
+        if minimum(cp_interval) <= ytest[i] <= maximum(cp_interval)
+            cp_total += 1
+        end
+
+        push!(ybo, result.x̂' * xtest)
+    end
+
+    m = result.x̂' * w / d
+    q = result.x̂' * result.x̂ / d
+    println("Accuracy of Bayes-optimal : $(Statistics.mean((ybo .- ytest).^(2.0))) vs $(1.0 - 2 * m + q)")
+
+    println("Coverage of Bayes optimal : $(bo_total / ntest)")
+    println("Coverage of conformal prediction : $(cp_total / ntest)")
+
+    # stephist(bo_interval_size, title="$problem_str regression - Bayes-optimal intervals", label="Bayes-optimal intervals")
+    plt = scatter(bo_interval_size, cp_interval_size)
+end
+
+# test("lasso")
+compare_bayes_optimal_conformal_intervals("ridge")
