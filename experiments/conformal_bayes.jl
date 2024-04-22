@@ -61,13 +61,14 @@ function compare_bayes_optimal_conformal_intervals(problem_str::String)
         - Look at the coverage of Bayes-posterior and Full Conformal Prediction (either exact or approximated)
         - Compare the size of the intervals
     """
-    α = 1.0
+    α = 2.0
     rng = StableRNG(0)
     d = 200
+    Δ = 1.0 # don't change this parameter
 
-    gamp = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4)
+    gamp = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4, δy_perturbation=0.1)
     
-    coverage = 0.9
+    coverage = 0.75
     quantile = Distributions.quantile(Normal(), 0.5 + coverage / 2.0)
     println("CDF between -quantile and quantile is $(cdf(Normal(), quantile) - cdf(Normal(), -quantile))")
     fcp = ConformalAmp.FullConformal(δy_range = 0.1:0.05:4.0, coverage = coverage)
@@ -77,7 +78,7 @@ function compare_bayes_optimal_conformal_intervals(problem_str::String)
 
     (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
 
-    ntest = 200
+    ntest = 1000
     Xtest = ConformalAmp.sample_data_any_n(rng, d, ntest)
     ytest = ConformalAmp.sample_labels(rng, problem, Xtest, w)
 
@@ -89,13 +90,13 @@ function compare_bayes_optimal_conformal_intervals(problem_str::String)
 
     result = ConformalAmp.gamp(problem, X, y; rtol=1e-4)
     
-
     for i in ProgressBar(1:ntest)
     # compute the confidence interval for the Bayes-optimal estimator
         xtest = Xtest[i, :]
         
         # the prediction is a Gaussian, for α coverage, we take the quantile of the Gaussian
-        bo_interval = [result.x̂' * xtest - sqrt(result.v̂' * (xtest.^2)) * quantile, result.x̂' * xtest + sqrt(result.v̂' * (xtest.^2)) * quantile]
+        # don't forget to add the aleatoric noise Δ = 1 to the confidence interval
+        bo_interval = [result.x̂' * xtest - sqrt(Δ + result.v̂' * (xtest.^2)) * quantile, result.x̂' * xtest + sqrt(Δ + result.v̂' * (xtest.^2)) * quantile]
         push!(bo_interval_size, maximum(bo_interval) - minimum(bo_interval))
         if minimum(bo_interval) <= ytest[i] <= maximum(bo_interval)
             bo_total += 1
@@ -113,14 +114,14 @@ function compare_bayes_optimal_conformal_intervals(problem_str::String)
 
     m = result.x̂' * w / d
     q = result.x̂' * result.x̂ / d
-    println("Accuracy of Bayes-optimal : $(Statistics.mean((ybo .- ytest).^(2.0))) vs $(1.0 - 2 * m + q)")
 
     println("Coverage of Bayes optimal : $(bo_total / ntest)")
     println("Coverage of conformal prediction : $(cp_total / ntest)")
 
     # stephist(bo_interval_size, title="$problem_str regression - Bayes-optimal intervals", label="Bayes-optimal intervals")
-    plt = scatter(bo_interval_size, cp_interval_size)
+    plt = scatter(bo_interval_size, cp_interval_size, xaxis="BO interval size", yaxis="CP interval size", title="CI at $coverage coverage for $problem_str regression")
+    # plot the line x = y for reference between the min and max of bo_interval_size
+    plot!([minimum(bo_interval_size), maximum(bo_interval_size)], [minimum(bo_interval_size), maximum(bo_interval_size)], label="", color="black")
 end
 
-# test("lasso")
 compare_bayes_optimal_conformal_intervals("ridge")
