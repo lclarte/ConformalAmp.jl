@@ -10,12 +10,12 @@ end
     # different from thep δy such that ỹ[n] = y[n] + δy  
     max_iter::Integer
     rtol::Float64
-    δy_perturbation::Float64 = 0.1
 end
 
 @kwdef struct ERM <: Method
 end
 
+# used to compute conformal by fitting ERM twice and compute the derivative by finite difference
 @kwdef struct ERMTaylor <: Method
 end
 
@@ -114,7 +114,7 @@ end
 
 function predict(::RegressionProblem, ŵ::AbstractMatrix, x::AbstractVector; bias::Real = 0.0)
     # ŵ can be a matrix to accomodate the cavities
-    return  ŵ * x + bias
+    return  ŵ * x .+ bias
 end
 
 function predict(::Logistic, ŵ::AbstractMatrix, x::AbstractVector)

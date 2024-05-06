@@ -32,21 +32,32 @@ function compare_jacknife_fcp_confidence_intervals()
     # define the problem and sample the data
     d   = 500
     α = 0.5
-    λ = 1e-6
+    λ = 1.0
     coverage = 0.9
 
     problem = ConformalAmp.Ridge(α = α, λ = λ, Δ = 1.0, Δ̂ = 1.0)
 
     rng = StableRNG(0)
+
     (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
 
-    xtest = ConformalAmp.sample_data_any_n(rng, d, 1)[1, :]
+    ntest = 100
+    xtest_array = ConformalAmp.sample_data_any_n(rng, d, ntest)
 
-    jplus_confidence_set = ConformalAmp.get_confidence_interval(problem, X, y, xtest, ConformalAmp.JacknifePlus(coverage = coverage), ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4))
-    fcp_confidence_set = ConformalAmp.get_confidence_interval(problem, X, y, xtest, ConformalAmp.FullConformal(coverage = coverage, δy_range = 0:0.1:2.0), ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4))
+    width_jacknife = []
+    width_fcp = []
 
-    println("J+  :",  minimum(jplus_confidence_set), " ", maximum(jplus_confidence_set))
-    println("FCP : ", minimum(fcp_confidence_set), " ", maximum(fcp_confidence_set)) 
+    for i in ProgressBar(1:ntest)
+        xtest = xtest_array[i, :]
+
+        jplus_confidence_set = ConformalAmp.get_confidence_interval(problem, X, y, xtest, ConformalAmp.JacknifePlus(coverage = coverage), ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4))
+        fcp_confidence_set = ConformalAmp.get_confidence_interval(problem, X, y, xtest, ConformalAmp.FullConformal(coverage = coverage, δy_range = 0:0.1:3.0), ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4))
+
+        push!(width_jacknife, maximum(jplus_confidence_set) - minimum(jplus_confidence_set))
+        push!(width_fcp, maximum(fcp_confidence_set) - minimum(fcp_confidence_set))
+    end
+
+    scatter(width_jacknife, width_fcp, title="Jacknife vs FCP", xaxis="Jacknife width", yaxis="FCP width")
 end
 
 #### 
@@ -71,7 +82,7 @@ function compare_intervals_fcp_erm_gamptaylor(problem::ConformalAmp.Problem; d::
         xtest = xtest_array[i, :]
         ci_erm = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo, ConformalAmp.ERM())
         ci_amptaylor = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo,     
-                                ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-3, δy_perturbation = 0.1))
+                                ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-3))
         ci_amp = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo,     
                                 ConformalAmp.GAMP(max_iter = 100, rtol = 1e-3))
         ci_ermrefit = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo, ConformalAmp.ERMTaylor())
@@ -100,7 +111,7 @@ function compare_length_fcp_erm_gamptaylor(problem::ConformalAmp.Problem; d::Int
         xtest = xtest_array[i, :]
         ci_erm = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo, ConformalAmp.ERM())
         ci_amptaylor = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo,     
-                                ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-3, δy_perturbation = 0.1))
+                                ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-3))
         push!(length_erm, maximum(ci_erm) - minimum(ci_erm))
         push!(length_amptaylor, maximum(ci_amptaylor) - minimum(ci_amptaylor))
     end
@@ -121,7 +132,7 @@ function compute_coverage_gamp_taylor(problem::ConformalAmp.Problem; d::Integer 
     ytest   = ConformalAmp.sample_labels(rng, problem, xtest, w)
 
     fcp = ConformalAmp.FullConformal(coverage = 0.9, δy_range = -0.0:0.05:5.0)
-    method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4, δy_perturbation = 0.1)
+    method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)
     
     total_covered = 0
 
@@ -141,8 +152,8 @@ function experiment_jaccard()
     """
     Compute the jaccard index between confidence intervals of ERM and other methods 
     """
-    d = 100
-    problem = ConformalAmp.Ridge(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
+    d = 200
+    problem = ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
     # problem = ConformalAmp.Pinball(α = 0.5, λ = 1e-1, Δ = 1.0, q = 0.9)
     
     @time jaccard_list_erm_amptaylor, jaccard_list_erm_amp, jaccard_list_erm_ermrefit = compare_intervals_fcp_erm_gamptaylor(problem; d = d, ntest=20)
@@ -164,9 +175,10 @@ function experiment_length()
     Compare the lengthes of the confidence intervals 
     """
     d = 50
-    problem = ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
+    problem = ConformalAmp.Lasso(α = 2.0, λ = 0.1, Δ = 1.0, Δ̂ = 1.0)
     
     length_erm, length_amptaylor = compare_length_fcp_erm_gamptaylor(problem; d = d, ntest=100)
+    mean_relative_difference = mean((length_amptaylor - length_erm) ./ length_erm)
 
     min_bound = minimum([minimum(length_erm), minimum(length_amptaylor)])
     max_bound = maximum([maximum(length_erm), maximum(length_amptaylor)])
@@ -182,6 +194,9 @@ function experiment_length()
     # plot the diagonal
     plot!(plt, min_bound:step:max_bound, min_bound:step:max_bound, label="", color=:black)
 
+
+    println("on average, AMP taylor is $(round(mean_relative_difference, sigdigits=2)) larger than the length of ERM")
+
     display(plt)
     # save the plot
     savefig(plt, "plots/length_$(problem).png")
@@ -194,7 +209,7 @@ function experiment_coverage()
     
     for d in ProgressBar(d_list)
         coverages = []
-        for seed in 1:25
+        for seed in 1:1
             c = compute_coverage_gamp_taylor(problem; d = d, ntest = 100, rng_seed = seed)
             push!(coverages, c)
         end
@@ -202,10 +217,50 @@ function experiment_coverage()
         push!(mean_coverages, mean(coverages))
     end
     
-    scatter(d_list, mean_coverages, label="GAMP Taylor", xaxis="d", yaxis="coverage", title="$(problem)")
+    plt = scatter(d_list, mean_coverages, label="GAMP Taylor", xaxis="d", yaxis="coverage", title="$(problem)")
     # draw black line at y = 0.9
-    plot!(d_list, 0.9 * ones(length(d_list)), label="0.9", color=:black)
-    savefig("plots/coverage_gamp_taylor_$(problem).png")
+    plot!(plt, d_list, 0.9 * ones(length(d_list)), label="0.9", color=:black)
+    display(plt)
+    # savefig("plots/coverage_gamp_taylor_$(problem).png")
+
 end
 
-experiment_coverage()
+function experiment_time()
+    """
+    Compare the time of execution of our method and 
+    """
+    d_range = 50:50:500
+
+    problem = ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
+    fcp     = ConformalAmp.FullConformal(coverage = 0.9, δy_range = -5.0:0.2:5.0)
+    
+    rng = StableRNG(0)
+
+    times_erm = []
+    times_amptaylor = []
+
+    for d in d_range
+        (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+        xtest = ConformalAmp.sample_data_any_n(rng, d, 1)
+        # compute the confidence interval with ERM and AMP Taylor
+        time_erm_debut = time()
+        ConformalAmp.get_confidence_interval(problem, X, y, xtest[1, :], fcp, ConformalAmp.ERM())
+        push!(times_erm, time() - time_erm_debut)
+
+        time_gamp_debut = time()
+        ConformalAmp.get_confidence_interval(problem, X, y, xtest[1, :], fcp, ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4))
+        push!(times_amptaylor, time() - time_gamp_debut)
+    end
+
+    plt = scatter(d_range, times_erm, label="ERM", xaxis="d", yaxis="time", title="$(problem)", yscale=:log10, xscale=:log10)
+    scatter!(d_range, times_amptaylor, label="GAMP Taylor")
+    display(plt)
+end
+
+# experiment_coverage()
+# experiment_length()
+# experiment_jaccard()
+
+experiment_time()
+
+# compare_jacknife_fcp_confidence_intervals()

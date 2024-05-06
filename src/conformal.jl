@@ -197,10 +197,10 @@ function get_confidence_interval(problem::RegressionProblem, X::AbstractMatrix, 
     y_augmented[end] = ŷ
     result  = gamp(problem, X_augmented, y_augmented; max_iter = method.max_iter, rtol = method.rtol)
     Δresult = compute_order_one_perturbation_gamp(problem, X_augmented, y_augmented, result; 
-                                            max_iter = method.max_iter, rtol = method.rtol, δy = method.δy_perturbation)
+                                            max_iter = method.max_iter, rtol = method.rtol)
     Ŵ_0     = get_cavity_means_from_gamp(X_augmented, result)
     # we divide by δy_perturbation so that we only have to multiply by δy after
-    ΔŴ      = (1.0 / method.δy_perturbation) * get_derivative_cavity_means(X_augmented, result, Δresult)
+    ΔŴ      = get_derivative_cavity_means(X_augmented, result, Δresult)
 
     # LOWER BOUND 
     for δy in reverse(δy_range)

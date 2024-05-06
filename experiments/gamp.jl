@@ -52,16 +52,16 @@ function test_gamp_order_one()
     """
     d = 1000
     α = 0.5
-    λ = 1e-4
+    λ = 1e-2
 
-    problem = ConformalAmp.Ridge(α = α, λ = λ, Δ = 1.0, Δ̂ = 1.0)
+    problem = ConformalAmp.Lasso(α = α, λ = λ, Δ = 1.0, Δ̂ = 1.0)
     n = ConformalAmp.get_n(α, d)
     (; X, w, y) = ConformalAmp.sample_all(StableRNG(0), problem, d)
 
     method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-6)
 
     result  = ConformalAmp.gamp(problem, X, y; max_iter =  method.max_iter, rtol =  method.rtol)
-    Δresult = ConformalAmp.compute_order_one_perturbation_gamp(problem, X, y, result; max_iter = method.max_iter, rtol = method.rtol, δy = 1.0)
+    Δresult = ConformalAmp.compute_order_one_perturbation_gamp(problem, X, y, result; max_iter = method.max_iter, rtol = method.rtol)
 
     # compute the estimator by a refitting of AMP and compare the results
 
@@ -139,14 +139,14 @@ function test_gamp_order_one_wrt_d(problem::ConformalAmp.Problem, d_range::Abstr
     for i in 1:avg_num
         for i_d in ProgressBar(eachindex(d_range))
             d = d_range[i_d]
-            n = ConformalAmp.get_n(α, d)
+            n = ConformalAmp.get_n(problem.α, d)
             (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
             result  = ConformalAmp.gamp(problem, X, y; max_iter =  method.max_iter, rtol =  method.rtol)
             result_erm = ConformalAmp.fit(problem, X, y, ConformalAmp.ERM())
             
             debut_taylor = time()
             # ∂ResultGamp × δy
-            Δresult = ConformalAmp.compute_order_one_perturbation_gamp(problem, X, y, result; max_iter = method.max_iter, rtol = method.rtol, δy = δy)
+            Δresult = δy * ConformalAmp.compute_order_one_perturbation_gamp(problem, X, y, result; max_iter = method.max_iter, rtol = method.rtol)
             fin_taylor = time()
             
             y[n] = y[n] + δy
@@ -184,7 +184,7 @@ function test_gamp_order_one_wrt_d(problem::ConformalAmp.Problem, d_range::Abstr
     mean_differences_refit = Statistics.mean(differences_refit[var], dims=1)[1, :]
     mean_differences_taylor = Statistics.mean(differences_taylor[var], dims=1)[1, :]
     pl = plot(d_range, mean_differences_refit, xaxis = :log, yaxis = :log, label="Difference refit (GAMP)")
-    plot!(d_range, mean_differences_taylor, label="Difference Taylor")
+    plot!(d_range, mean_differences_taylor, marker=:circle, label="Difference Taylor")
 
     if var == "x̂"
         mean_differences_erm_refit = Statistics.mean(differences_refit_erm[var], dims=1)[1, :]
@@ -271,4 +271,6 @@ function test_gamp_order_one_loo_wrt_d(problem::ConformalAmp.Problem, d_range::A
     display(pl)
 end
 
-difference_erm_gamp()
+# test_gamp_order_one()
+test_gamp_order_one_wrt_d(ConformalAmp.Lasso(Δ=1.0, Δ̂=1.0,α=0.5,λ=0.5), 100:100:1000; 
+                                δy = 10.0, rng_num = 0, avg_num = 1, var = "x̂")

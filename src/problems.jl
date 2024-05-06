@@ -54,6 +54,15 @@ end
     λ::Float64 = 1.0
 end
 
+@kwdef struct BayesOptimalPinball <: RegressionProblem
+    # don't need to use the bias here as we know the true distribution
+    # of the residuals 
+    q::Float64 # to estimate quantile q
+    α::Float64
+    λ::Float64 = 1.0
+    Δ::Float64 = 1.0
+end
+
 function Base.show(io::IO, problem::Ridge) 
     print(io, "Ridge(Δ = $(problem.Δ), Δ̂ = $(problem.Δ̂), λ = $(problem.λ), α = $(problem.α))")
 end

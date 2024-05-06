@@ -29,6 +29,7 @@ function Base.:+(res1::GampResult, res2::GampResult)
         V = res1.V + res2.V,
         A = res1.A + res2.A,
         b = res1.b + res2.b,
+        g = res1.g + res2.g,
         dg = res1.dg + res2.dg,
     )
 end
@@ -60,10 +61,6 @@ function Base.:*(c::Real, res::GampResult)
 end
 
 ## 
-
-function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, ::Logistic; rtol = 1e-3)::Tuple{AbstractVector, AbstractVector}
-    return LogisticChannel.gₒᵤₜ_and_∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol)
-end
 
 function channel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Union{Ridge, Lasso, BayesOptimalRidge, BayesOptimalLasso}; rtol = 1e-3)::Tuple{AbstractVector, AbstractVector}
     # use Δ̂ as it's the factor used by the student
@@ -101,6 +98,10 @@ function ∂ychannel(y::Real, ω::Real, V::Real, problem::Pinball; rtol = 1e-3)
     return PinballChannel.∂ygₒᵤₜ_and_∂y∂ωgₒᵤₜ(y, ω, V; q = problem.q)
 end
 
+function ∂Vchannel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, problem::Union{Lasso, Ridge, BayesOptimalRidge, BayesOptimalLasso}; rtol = 1e-3)
+    return RidgeChannel.∂Vgₒᵤₜ_and_∂V∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, Δ = problem.Δ̂)
+end
+
 function prior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic, Pinball, BayesOptimalLogistic, BayesOptimalRidge})
     """
     For L2 penalty
@@ -112,33 +113,6 @@ function prior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logis
     # end
 
     return b ./ (λ .+ A), 1. ./ (λ .+ A)
-end
-
-function prior(b::AbstractVector, A::AbstractVector, problem::Lasso)
-    """
-    for l1 penalty
-    """
-    (; λ) = problem
-
-    function fa(b_, A_) # sigma = 1 / A > 0, r = b / A
-        if abs(b_) < λ
-            return 0.0
-        elseif b_ > λ
-            return (b_ - λ) / A_
-        else
-            return (b_ + λ) / A_
-        end
-    end
-
-    function fv(b_, A_)
-        if abs(b_) < λ
-            return 0.0
-        else
-            return 1.0 / A_
-       end
-    end
-
-    return fa.(b, A), fv.(b, A)
 end
 
 function prior(b::AbstractVector, A::AbstractVector, problem::BayesOptimalLasso)
@@ -176,56 +150,19 @@ function prior(b::AbstractVector, A::AbstractVector, problem::BayesOptimalLasso)
     return fa, fv
 end
 
-## derivatives of the prior for regression problem, useful for 
+## derivatives of the prior for regression problem for Taylor-gamp
+# on pourrait inclure Logistic dedans mais ca servirait a rien
 
-function ∂bprior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic, Pinball})
+function ∂bprior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Pinball})
     (; λ) = problem
 
     return (1 ./ A) ./ (λ ./ A .+ 1.0), zeros(size(b))
 end
 
-function ∂Aprior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic, Pinball})
+function ∂Aprior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Pinball})
     (; λ) = problem
 
     return - b ./ (λ .+ A).^2., - 1.0 ./ (λ .+ A).^2.
-end
-
-function ∂bprior(b::AbstractVector, A::AbstractVector, problem::Lasso)
-    (; λ) = problem
-
-    function ∂bfa(b_, A_)
-        if abs(b_) < λ
-            return 0.0
-        else
-            return 1.0 / A_
-        end
-    end
-
-    return ∂bfa.(b, A), zeros(size(b))
-end
-
-function ∂Aprior(b::AbstractVector, A::AbstractVector, problem::Lasso)
-    (; λ) = problem
-
-    function ∂Afa(b_, A_) # sigma = 1 / A > 0, r = b / A
-        if abs(b_) < λ
-            return 0.0
-        elseif b_ > λ
-            return -(b_ - λ) / A_^2.
-        else
-            return -(b_ + λ) / A_^2.
-        end
-    end
-    
-    function ∂Afv(b_, A_)
-        if abs(b_) < λ
-            return 0.0
-        else
-            return - 1.0 / A_^2.
-       end
-    end
-
-    return ∂Afa.(b, A), ∂Afv.(b, A)
 end
 
 ##
@@ -343,7 +280,7 @@ end
 
 ##
 
-function compute_order_one_perturbation_gamp(problem::RegressionProblem, X::AbstractMatrix, y::AbstractVector, result::GampResult; max_iter::Integer = 10, rtol::Real = 1e-3, δy::Real = 1.0)
+function compute_order_one_perturbation_gamp(problem::RegressionProblem, X::AbstractMatrix, y::AbstractVector, result::GampResult; max_iter::Integer = 10, rtol::Real = 1e-3)
     """
     The idea is to use the convergence of GAMP algo and iterate over Δx̂, Δv̂, ΔV and Δω until convergence. the Δw returned is for δy = 1 
     By convention, we'll assume the last sample sees its label changed
@@ -363,26 +300,27 @@ function compute_order_one_perturbation_gamp(problem::RegressionProblem, X::Abst
     
     ∂ychannel_ = ∂ychannel(y[n], ω[n], V[n], problem; rtol = rtol)
     ∂ωchannel_ = ∂ωchannel(y, ω, V, problem; rtol = rtol)
+    ∂Vchannel_ = ∂Vchannel(y, ω, V, problem; rtol = rtol)
     
     ∂bprior_ = ∂bprior(b, A, problem)
     ∂Aprior_ = ∂Aprior(b, A, problem)
 
     for iteration in 1:max_iter
-        ΔV = X_squared * Δv̂
-        Δω = X * Δx̂ - ΔV .* g - V .* Δg
+        ΔV = X_squared * Δv̂ # OK
+        Δω = X * Δx̂ - ΔV .* g - V .* Δg # OK
 
-        Δg, Δ∂g = ∂ωchannel_[1] .* Δω, ∂ωchannel_[2] .* Δω
+        Δg, Δ∂g = ∂ωchannel_[1] .* Δω + ∂Vchannel_[1] .* ΔV, ∂ωchannel_[2] .* Δω + ∂Vchannel_[2] .* ΔV # OK, TO TEST 
 
-        Δg[n] += δy * ∂ychannel_[1]
-        Δ∂g[n]+= δy * ∂ychannel_[2]
+        Δg[n] += ∂ychannel_[1]
+        Δ∂g[n]+= ∂ychannel_[2]
 
-        ΔA = - (X_squared)' * Δ∂g
-        Δb = X' * Δg + A .* Δx̂ + ΔA .* x̂
+        ΔA = - (X_squared)' * Δ∂g # OK
+        Δb = X' * Δg + A .* Δx̂ + ΔA .* x̂ # OK
 
         Δx̂_old = copy(Δx̂)
 
-        Δx̂ = ∂bprior_[1] .* Δb .+ ∂Aprior_[1] .* ΔA
-        Δv̂ = ∂bprior_[2] .* Δb .+ ∂Aprior_[2] .* ΔA
+        Δx̂ = ∂bprior_[1] .* Δb .+ ∂Aprior_[1] .* ΔA # OK
+        Δv̂ = ∂bprior_[2] .* Δb .+ ∂Aprior_[2] .* ΔA # OK
 
         if norm(Δx̂ - Δx̂_old) / norm(Δx̂) < rtol
             break
