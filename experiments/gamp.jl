@@ -271,6 +271,5 @@ function test_gamp_order_one_loo_wrt_d(problem::ConformalAmp.Problem, d_range::A
     display(pl)
 end
 
-# test_gamp_order_one()
-test_gamp_order_one_wrt_d(ConformalAmp.Lasso(Δ=1.0, Δ̂=1.0,α=0.5,λ=0.5), 100:100:1000; 
-                                δy = 10.0, rng_num = 0, avg_num = 1, var = "x̂")
+test_gamp_order_one()
+# test_gamp_order_one_wrt_d(ConformalAmp.Lasso(Δ=1.0, Δ̂=1.0,α=0.5,λ=0.5), 100:100:1000;  δy = 10.0, rng_num = 0, avg_num = 1, var = "x̂")

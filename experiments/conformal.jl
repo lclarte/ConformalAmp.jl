@@ -62,12 +62,12 @@ end
 
 #### 
 
-function compare_intervals_fcp_erm_gamptaylor(problem::ConformalAmp.Problem; d::Integer = 100, ntest::Integer = 10)
+function compare_intervals_fcp_erm_gamptaylor(problem::ConformalAmp.Problem; d::Integer = 100, ntest::Integer = 10, seed::Integer = 0)
     """
     Compare the confidence interval given by ERM() so by refitting everything and GAMPTaylor for a
     single test point at a fixed dimension
     """
-    rng = StableRNG(51)
+    rng = StableRNG(seed)
 
     (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
     xtest_array = ConformalAmp.sample_data_any_n(rng, d, ntest)
@@ -152,9 +152,8 @@ function experiment_jaccard()
     """
     Compute the jaccard index between confidence intervals of ERM and other methods 
     """
-    d = 200
-    problem = ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
-    # problem = ConformalAmp.Pinball(α = 0.5, λ = 1e-1, Δ = 1.0, q = 0.9)
+    d = 100
+    problem = ConformalAmp.Lasso(α = 0.5, λ = 0.1, Δ = 1.0, Δ̂ = 1.0)
     
     @time jaccard_list_erm_amptaylor, jaccard_list_erm_amp, jaccard_list_erm_ermrefit = compare_intervals_fcp_erm_gamptaylor(problem; d = d, ntest=20)
     
@@ -167,7 +166,7 @@ function experiment_jaccard()
 
     display(plt)
     # save the plot
-    savefig(plt, "plots/jaccard_$(problem).png")
+    # savefig(plt, "plots/jaccard_$(problem).png")
 end
 
 function experiment_length()
@@ -259,7 +258,7 @@ end
 
 # experiment_coverage()
 # experiment_length()
-# experiment_jaccard()
+# experiment_jaccard()
 
 experiment_time()
 

@@ -76,7 +76,7 @@ function fit_leave_one_out(problem::Problem, X::AbstractMatrix, y::AbstractVecto
     return w
 end
 
-function fit_leave_one_out(problem::Problem, X::AbstractMatrix, y::AbstractVector, method::GAMP)
+function fit_leave_one_out(problem::Problem, X::AbstractMatrix, y::AbstractVector, method::Union{GAMP, GAMPTaylor})
     (; x̂, v̂, ω) = gamp(problem, X, y; max_iter=method.max_iter, rtol=method.rtol)
     return get_cavity_means_from_gamp(problem, X, y, x̂, v̂, ω; rtol = method.rtol)
 end
