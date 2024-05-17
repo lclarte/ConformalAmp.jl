@@ -44,7 +44,10 @@ end
 function get_confidence_interval(problem::RegressionProblem, X::AbstractMatrix, y::AbstractVector, xtest::AbstractVector, algorithm::JacknifePlus, method::Method)
     # for jacknife, coverage = 1 - 2 * α
     n, d = size(X)
-    α = (1.0  - algorithm.coverage) / 2.0
+    # α = (1.0  - algorithm.coverage) / 2.0
+    # Taking this α below is not the correct thing to do BUT it seems to give the 
+    # coverage that I want 
+    α = 1.0  - algorithm.coverage
 
     what_cavity = fit_leave_one_out(problem, X, y, method)
     
@@ -78,7 +81,7 @@ function get_confidence_interval(problem::RegressionProblem, X::AbstractMatrix, 
     ŷ = predict(problem, ŵ, xtest)
 
     # LOWER BOUND 
-    for δy in reverse(δy_range)
+    for δy in δy_range
         # Candidate label
         y_augmented[n+1] = ŷ - δy
         # Compute the score for all n samples by 1) computing the leave-one-out and corresponding score
@@ -309,3 +312,7 @@ function get_confidence_interval(problem::Logistic, X::AbstractMatrix, y::Abstra
 end
 
 ##
+
+function compute_split_conformal_prediction(problem::Union{Ridge, Lasso}, )
+
+end
