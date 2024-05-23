@@ -1,3 +1,7 @@
+"""
+Compare the size of the confidence intervals between the Bayes-optimal estimator and conformal prediction (both Taylor AMP and SCP)
+"""
+
 using ConformalAmp
 using Distributions
 using Statistics

@@ -1,3 +1,7 @@
+"""
+Plot to compute the jaccard index between exact FCP and AMPTaylor, as well as split conformal prediction
+"""
+
 using ProgressBars
 using StableRNGs: StableRNG
 using Statistics
@@ -10,7 +14,7 @@ function jaccard_index(a1::Real, b1::Real, a2::Real, b2::Real)
     return intersection / union
 end
 
-function compare_intervals_fcp_erm_gamptaylor(problem::ConformalAmp.Problem; d::Integer = 100, ntest::Integer = 10, seed::Integer = 0)
+function compute_jaccard_amp_scp(problem::ConformalAmp.Problem; d::Integer = 100, ntest::Integer = 10, seed::Integer = 0)
     """
     Compare the confidence interval given by ERM() so by refitting everything and GAMPTaylor for a
     single test point at a fixed dimension
@@ -26,7 +30,7 @@ function compare_intervals_fcp_erm_gamptaylor(problem::ConformalAmp.Problem; d::
     jaccard_list_erm_amptaylor = []
     jaccard_list_erm_scp = []
 
-    for i in ProgressBar(1:ntest)
+    for i in 1:ntest
         xtest = xtest_array[i, :]
         ci_erm = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo, ConformalAmp.ERM())
         ci_amptaylor = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo,     
@@ -43,15 +47,18 @@ function compare_intervals_fcp_erm_gamptaylor(problem::ConformalAmp.Problem; d::
 end
 
 α = 2.0
-λ_range = [0.01, 0.1, 1.0]
 d = 50
 
-for λ in λ_range
-    problem = ConformalAmp.Lasso(α = α, λ = λ, Δ = 1.0, Δ̂ = 1.0)
-    println("$problem : mean jaccard is")
-    jaccard_list_erm_amptaylor, jaccard_list_erm_scp = compare_intervals_fcp_erm_gamptaylor(problem; d=d, ntest=50, seed=0)
+problems = [
+    ConformalAmp.Lasso(α = α, λ = 0.01, Δ = 1.0, Δ̂ = 1.0),
+    ConformalAmp.Lasso(α = α, λ = 0.1, Δ = 1.0, Δ̂ = 1.0),
+    ConformalAmp.Lasso(α = α, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
+]
 
-    println("mean for $λ : $(mean(jaccard_list_erm_amptaylor)), $(mean(jaccard_list_erm_scp))")
+for problem in problems
+    jaccard_list_erm_amptaylor, jaccard_list_erm_scp = compute_jaccard_amp_scp(problem; d=d, ntest=50, seed=0)
+
+    println("Mean for $problem : $(mean(jaccard_list_erm_amptaylor)), $(mean(jaccard_list_erm_scp))")
     # print standard deviation
-    println("std for $λ : $(std(jaccard_list_erm_amptaylor)), $(std(jaccard_list_erm_scp))")
+    println("Std for $λ : $(std(jaccard_list_erm_amptaylor)), $(std(jaccard_list_erm_scp))")
 end

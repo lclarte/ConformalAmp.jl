@@ -15,10 +15,6 @@ end
 @kwdef struct ERM <: Method
 end
 
-# used to compute conformal by fitting ERM twice and compute the derivative by finite difference
-@kwdef struct ERMTaylor <: Method
-end
-
 ### 
 
 function fit(problem::Ridge, X::AbstractMatrix, y::AbstractVector, ::ERM)
@@ -80,8 +76,6 @@ function fit_leave_one_out(problem::Problem, X::AbstractMatrix, y::AbstractVecto
     (; x̂, v̂, ω) = gamp(problem, X, y; max_iter=method.max_iter, rtol=method.rtol)
     return get_cavity_means_from_gamp(problem, X, y, x̂, v̂, ω; rtol = method.rtol)
 end
-
-## TODO : Regrouper dans les memes fonctions  
 
 function predict(::RegressionProblem, ŵ::AbstractVector, X::AbstractMatrix; bias::Real = 0.0)
     # add the same bias since we have only one predictor
