@@ -65,10 +65,10 @@ function compare_bayes_optimal_conformal_intervals(problem_str::String; λ_erm::
         - Compare the size of the intervals
     """
     rng = StableRNG(seed)
-    d = 100
+    d = 500
     Δ = 1.0 # don't change this parameter
 
-    algo = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4, δy_perturbation=0.1)
+    algo = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)
     # algo = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4)
     
     coverage = 0.9

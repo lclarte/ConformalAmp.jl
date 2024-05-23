@@ -1,3 +1,7 @@
 plots
 experiments/paper/*.pdf
+<<<<<<< HEAD
 experiments/paper/*.png
+=======
+experiments/paper/*.png
+>>>>>>> clean

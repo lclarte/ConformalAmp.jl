@@ -102,7 +102,7 @@ function compare_length_fcp_erm_gamptaylor(problem::ConformalAmp.Problem; d::Int
     (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
     xtest_array = ConformalAmp.sample_data_any_n(rng, d, ntest)
 
-    algo = ConformalAmp.FullConformal(δy_range = -5.0:0.2:5.0, coverage = 0.9)
+    algo = ConformalAmp.FullConformal(δy_range = -2.5:0.02:2.5, coverage = 0.9)
 
     length_erm = []
     length_amptaylor = []
@@ -174,7 +174,8 @@ function experiment_length()
     Compare the lengthes of the confidence intervals 
     """
     d = 50
-    problem = ConformalAmp.Lasso(α = 2.0, λ = 0.1, Δ = 1.0, Δ̂ = 1.0)
+    problem = ConformalAmp.Ridge(α = 2.0, λ = 0.01, Δ = 1.0, Δ̂ = 1.0)
+    println("Problem is : $(problem)")
     
     length_erm, length_amptaylor = compare_length_fcp_erm_gamptaylor(problem; d = d, ntest=100)
     mean_relative_difference = mean((length_amptaylor - length_erm) ./ length_erm)
@@ -193,73 +194,111 @@ function experiment_length()
     # plot the diagonal
     plot!(plt, min_bound:step:max_bound, min_bound:step:max_bound, label="", color=:black)
 
-
+    println("Average length for ERM is $(round(mean(length_erm), sigdigits=2))")
+    println("Average length for AMP taylor is $(round(mean(length_amptaylor), sigdigits=2))")
     println("on average, AMP taylor is $(round(mean_relative_difference, sigdigits=2)) larger than the length of ERM")
 
     display(plt)
     # save the plot
-    savefig(plt, "plots/length_$(problem).png")
+    # savefig(plt, "plots/length_$(problem).png")
 end
 
 function experiment_coverage()
-    mean_coverages = []
-    d_list = 50:10:200
-    problem = ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
     
-    for d in ProgressBar(d_list)
-        coverages = []
-        for seed in 1:1
-            c = compute_coverage_gamp_taylor(problem; d = d, ntest = 100, rng_seed = seed)
-            push!(coverages, c)
+    d_list = 50:50:500
+
+    problems = [
+        ConformalAmp.Ridge(α = 0.5, λ = 0.1, Δ = 1.0, Δ̂ = 1.0),
+        ConformalAmp.Ridge(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0),
+        ConformalAmp.Lasso(α = 0.5, λ = 0.1, Δ = 1.0, Δ̂ = 1.0),
+        ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
+    ]
+
+    names = [
+        "Ridge(λ = 0.1)",
+        "Ridge(λ = 1.0)",
+        "Lasso(λ = 0.1)",
+        "Lasso(λ = 1.0)"
+    ]
+
+    plt = plot(d_list, 0.75 * ones(length(d_list)), label="Target coverage", color=:black)
+
+    for i in eachindex(problems)
+        mean_coverages = []
+        problem = problems[i]
+        for d in ProgressBar(d_list)
+            coverages = []
+            for seed in 1:200
+                c = compute_coverage_gamp_taylor(problem; d = d, ntest = 1, rng_seed = seed+1)
+                push!(coverages, c)
+            end
+        
+            push!(mean_coverages, mean(coverages))
         end
-    
-        push!(mean_coverages, mean(coverages))
+        
+        plt = scatter!(plt, d_list, mean_coverages, label="$(names[i])", xaxis="d", yaxis="Coverage")
+        # draw black line at y = 0.9
+        display(plt)
     end
-    
-    plt = scatter(d_list, mean_coverages, label="GAMP Taylor", xaxis="d", yaxis="coverage", title="$(problem)")
-    # draw black line at y = 0.9
-    plot!(plt, d_list, 0.9 * ones(length(d_list)), label="0.9", color=:black)
-    display(plt)
-    # savefig("plots/coverage_gamp_taylor_$(problem).png")
+    savefig("plots/coverage_gamp_taylor.pdf")
 
 end
 
-function experiment_time()
+function experiment_time(problem)
     """
     Compare the time of execution of our method and 
     """
-    d_range = 50:50:500
+    d_range_fcp = (10.0).^(2:0.25:4)
+    d_range_erm = (10.0).^(2:0.25:3)
 
-    problem = ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
-    fcp     = ConformalAmp.FullConformal(coverage = 0.9, δy_range = -5.0:0.2:5.0)
+    fcp     = ConformalAmp.FullConformal(coverage = 0.9, δy_range = 0.0:0.5:1.0)
     
     rng = StableRNG(0)
 
     times_erm = []
     times_amptaylor = []
 
-    for d in d_range
+    for d in ProgressBar(d_range_erm)
+        d = Integer(floor(d))
         (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
         xtest = ConformalAmp.sample_data_any_n(rng, d, 1)
         # compute the confidence interval with ERM and AMP Taylor
         time_erm_debut = time()
         ConformalAmp.get_confidence_interval(problem, X, y, xtest[1, :], fcp, ConformalAmp.ERM())
         push!(times_erm, time() - time_erm_debut)
-
-        time_gamp_debut = time()
-        ConformalAmp.get_confidence_interval(problem, X, y, xtest[1, :], fcp, ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4))
-        push!(times_amptaylor, time() - time_gamp_debut)
     end
 
-    plt = scatter(d_range, times_erm, label="ERM", xaxis="d", yaxis="time", title="$(problem)", yscale=:log10, xscale=:log10)
-    scatter!(d_range, times_amptaylor, label="GAMP Taylor")
-    display(plt)
+    for d in ProgressBar(d_range_fcp)
+        d = Integer(floor(d))
+        (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+        xtest = ConformalAmp.sample_data_any_n(rng, d, 1)
+        # compute the confidence interval with ERM and AMP Taylor
+        time_amptaylor_debut = time()
+        ConformalAmp.get_confidence_interval(problem, X, y, xtest[1, :], fcp, ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4))
+        push!(times_amptaylor, time() - time_amptaylor_debut)
+    end
+
+    return d_range_erm, d_range_fcp, times_erm, times_amptaylor
 end
 
 # experiment_coverage()
 # experiment_length()
 # experiment_jaccard()
 
-experiment_time()
+"""
+problem = ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
+
+d_range_erm, d_range_fcp, times_erm, times_amptaylor = experiment_time(
+    problem
+)
+
+fs = 12
+plt = scatter(d_range_erm, times_erm, label="Exact FCP", xaxis="d", yaxis="Time (s)",
+yscale = :log10, xscale = :log10, legend=:topleft, color=:black,
+xtickfontsize=fs,ytickfontsize=fs, legendfontsize=fs)
+scatter!(d_range_fcp, times_amptaylor, label="AMP Taylor")
+display(plt)
+savefig(plt, "plots/time_erm_vs_amptaylor_$problem.pdf")
+"""
 
 # compare_jacknife_fcp_confidence_intervals()

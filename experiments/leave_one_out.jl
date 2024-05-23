@@ -53,7 +53,7 @@ function compare_gamp_erm(model::String, d::Integer)
     display(pl)
 end
 
-function compare_fcp_interpolation(model::String, d::Integer; rng::AbstractRNG = StableRNG(0))
+function compare_residuals(model::String, d::Integer; rng::AbstractRNG = StableRNG(0), λ::Real = 1.0)
     """
     Check that interpolation, the residuals are 0 and look at the residuals
          1) given by refitting the estimator and 
@@ -63,32 +63,16 @@ function compare_fcp_interpolation(model::String, d::Integer; rng::AbstractRNG =
     # small value of alpha to interpolate
     α = 0.5
     n = ceil(Int, α * d)
-    if model == "ridge"
-        # warning : if we take λ = 0 there are numerical issues for some reason
-        # prolly because we don't take the min l2-norm estimator
-        λ = 1e-6
-    elseif model == "logistic"
-        λ = 1e-6
-    else 
-        error("model not recognized")
-    end
 
-    problem = model == "logistic" ? ConformalAmp.Logistic(α = α, λ = λ) : ConformalAmp.Ridge(α = α, Δ = 1.0, λ = λ, Δ̂ = 1.0)
-    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+    problem = model == "lasso" ? ConformalAmp.Lasso(α = α, λ = λ, Δ = 1.0, Δ̂ = 1.0) : ConformalAmp.Ridge(α = α, Δ = 1.0, λ = λ, Δ̂ = 1.0)
     
-    (; x̂, v̂, ω) = ConformalAmp.gamp(problem, X, y; rtol=1e-5)
+    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
+    (; x̂, v̂, ω) = ConformalAmp.gamp(problem, X, y; rtol=1e-4)
 
     # run the leave one out and compare the difference in the predictions 
-    ŵ = ConformalAmp.fit(problem, X, y)
-    residuals = y .- ConformalAmp.predict(problem, ŵ, X)
+    ŵ_loo = ConformalAmp.fit_leave_one_out(problem, X, y, ConformalAmp.ERM())
 
-    # should be concentrated around 0 
-    pl = stephist(residuals; bins=100, label = "Residuals erm")
-    title!("Residuals of ŵ, λ = $λ, α = $α, d = $d")
-    savefig("plots/interpolation_residuals_ridge.png")
-
-    ŵ_loo = ConformalAmp.fit_leave_one_out(problem, X, y)
-    ŵ_cavities = ConformalAmp.get_cavity_means_from_gamp(problem, X, y, x̂, v̂, ω, rtol = 1e-5)
+    gamp_result = ConformalAmp.
 
     # Plot the residuals on the training data
     ŷ_loo              = diag(ConformalAmp.predict(problem, ŵ_loo, X))
@@ -98,20 +82,8 @@ function compare_fcp_interpolation(model::String, d::Integer; rng::AbstractRNG =
     pl = scatter(residuals_loo, residuals_cavities, label = "Residuals loo vs cavities",
                     xlabel = "Residuals loo", ylabel = "Residuals cavities of amp")
     title!("λ = $λ, α = $α, d = $d")
-    savefig("plots/interpolation_residuals_loo_ridge.png")
-
-    """
-    # not very intereting because for Full CP we treat the test sample as "training" data
-    # but we plot the predictions of the loo estimators for 1 new test sample
-    ntest = 1
-    Xtest = ConformalAmp.sample_data_any_n(rng, d, ntest)
-    # stores the prediction for every leave one out estiamtor on the new test sampel
-    ŷ_loo_test = ConformalAmp.predict(problem, ŵ_loo, Xtest)[1, :]
-    ŷ_cavities_test = ConformalAmp.predict(problem, ŵ_cavities, Xtest)[1, :]
-    pl = scatter(ŷ_loo_test, ŷ_cavities_test, label = "loo vs cavities",
-                    xlabel = "loo", ylabel = "cavities", title = "λ = $λ, α = $α, d = $d")
     display(pl)
-    """
+    # savefig("plots/interpolation_residuals_loo_ridge.png")
 end
 
 function compare_fcp_last_label_change(d::Integer; rng::AbstractRNG = StableRNG(0), problem_type::String = "ridge")
@@ -364,36 +336,6 @@ function plot_histogram_weights_label_change_wrt_d(problem::ConformalAmp.Regress
     display(pl)
 end
 
-function leave_one_out_residuals_erm_vs_gamp(problem::ConformalAmp.RegressionProblem, d::Integer; rng::AbstractRNG=StableRNG(0), δy::Real = 2.0)
-    
-    gamp_method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-3)
-    
-    n = ConformalAmp.get_n(problem.α, d)
-    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
-    ỹ = copy(y)
-    ỹ[n] = y[n] + δy
-    # Pour ERM(), on calcule directement le LOO avec ỹ puisqu'on sait que GAMP approxime 
-    # correctement le LOO
-    debut_erm = time()
-    Ŵ_erm  = ConformalAmp.fit_leave_one_out(problem, X, ỹ, ConformalAmp.ERM())
-    Δtime_erm = time() - debut_erm
-
-    debut_gamp = time()
-    result_gamp  = ConformalAmp.gamp(problem, X, y; gamp_method.max_iter, gamp_method.rtol)
-    Δresult_gamp = δy * ConformalAmp.compute_order_one_perturbation_gamp(problem, X, y, result_gamp; gamp_method.max_iter, gamp_method.rtol)
-    Ŵ_gamp       = ConformalAmp.get_cavity_means_order_one(problem, X, y, result_gamp, Δresult_gamp; rtol = gamp_method.rtol)
-    Δtime_gamp   = time() - debut_gamp
-    # 
-    residuals_erm  = ỹ - diag(ConformalAmp.predict(problem, Ŵ_erm, X))
-    residuals_gamp = ỹ - diag(ConformalAmp.predict(problem, Ŵ_gamp, X))
-
-    plt = scatter(residuals_erm, residuals_gamp, title="d = $d, time ERM = $Δtime_erm, time GAMP = $Δtime_gamp")
-    # plot the y = x line between the xmin and xmax
-    xmin, xmax = minimum(residuals_erm), maximum(residuals_erm)
-    plot!(plt, [xmin, xmax], [xmin, xmax], label="y = x", linestyle=:dash)
-    display(plt)
-end
-
 # ========== functions calls 
 
 # compare_at_interpolation("ridge", 500, rng = StableRNG(0))
@@ -411,6 +353,4 @@ seed = 10
 
 # plot_histogram_weights_label_change_wrt_d(ConformalAmp.Ridge(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), Vector{Int}(500:500:2000), 5.0)
 
-problem = ConformalAmp.Lasso(α = 1.0, Δ = 1.0, λ = λ, Δ̂ = 1.0)
-d       = 1000
-leave_one_out_residuals_erm_vs_gamp(problem, d; δy = 10.0)
+@time compare_fcp_interpolation("ridge", 200)
