@@ -313,6 +313,8 @@ end
 
 ##
 
-function compute_split_conformal_prediction(problem::Union{Ridge, Lasso}, )
+function get_confidence_interval(problem::Union{Ridge, Lasso}, X::AbstractMatrix, y::AbstractVector, xtest::AbstractVector, algo::SplitConformal, method::Method)
+    ŵ, q = split_conformal(problem, X, y, algo.coverage)
 
+    return (predict(problem, ŵ, xtest) - q, predict(problem, ŵ, xtest) + q)
 end

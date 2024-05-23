@@ -352,14 +352,3 @@ end
 function get_derivative_cavity_means(X::AbstractMatrix, result::GampResult, Δresult::GampResult)
     repeat(Δresult.x̂', size(X)[1], 1) - X .* (result.v̂ * Δresult.g' + Δresult.v̂ * result.g')' 
 end
-
-function get_cavity_means_order_one(problem::Problem, X::AbstractMatrix, y::AbstractVector, result::GampResult, Δresult::GampResult; rtol = 1e-3)
-    """
-    arguments : 
-        - Δresult : variation of GAMP result w.r.t δy > 0 (that implicitly multilplies Δresult so not included as argument)
-    """
-    n, _ = size(X)
-    Ŵ_0 = get_cavity_means_from_gamp(problem, X, y, result.x̂, result.v̂, result.ω; rtol = rtol)
-    ΔŴ  = get_derivative_cavity_means(X, result, Δresult)
-    return  Ŵ_0 + ΔŴ
-end
