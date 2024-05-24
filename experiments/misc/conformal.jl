@@ -30,37 +30,6 @@ end
 
 #### 
 
-function compare_intervals_fcp_erm_gamptaylor(problem::ConformalAmp.Problem; d::Integer = 100, ntest::Integer = 10, seed::Integer = 0)
-    """
-    Compare the confidence interval given by ERM() so by refitting everything and GAMPTaylor for a
-    single test point at a fixed dimension
-    """
-    rng = StableRNG(seed)
-
-    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
-    xtest_array = ConformalAmp.sample_data_any_n(rng, d, ntest)
-
-    algo = ConformalAmp.FullConformal(δy_range = -5.0:0.2:5.0, coverage = 0.9)
-
-    jaccard_list_erm_amptaylor = []
-    jaccard_list_erm_amp       = []
-    jaccard_list_erm_ermrefit = []
-
-    for i in ProgressBar(1:ntest)
-        xtest = xtest_array[i, :]
-        ci_erm = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo, ConformalAmp.ERM())
-        ci_amptaylor = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo,     
-                                ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-3))
-        ci_amp = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo,     
-                                ConformalAmp.GAMP(max_iter = 100, rtol = 1e-3))
-        ci_ermrefit = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo, ConformalAmp.ERMTaylor())
-        push!(jaccard_list_erm_amptaylor, jaccard_index(minimum(ci_erm), maximum(ci_erm), minimum(ci_amptaylor), maximum(ci_amptaylor)) )
-        push!(jaccard_list_erm_amp, jaccard_index(minimum(ci_erm), maximum(ci_erm), minimum(ci_amp), maximum(ci_amp)) )
-        push!(jaccard_list_erm_ermrefit, jaccard_index(minimum(ci_erm), maximum(ci_erm), minimum(ci_ermrefit), maximum(ci_ermrefit)) )
-    end
-    return (jaccard_list_erm_amptaylor, jaccard_list_erm_amp, jaccard_list_erm_ermrefit)
-end
-
 function compare_length_fcp_erm_gamptaylor(problem::ConformalAmp.Problem; d::Integer = 100, ntest::Integer = 10)
     """
     Compare the sizes of the confidence intervals given by the different algos 

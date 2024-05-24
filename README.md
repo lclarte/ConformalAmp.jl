@@ -5,7 +5,11 @@ This repository contains the Julia code used to reproduce the experiments of the
 The code is structured as follows:
 
 * `src`: contains the code for AMP and Taylor-AMP described in the paper. In particular, the functions `gamp` and `compute_order_one_perturbation_gamp` in the file `gamp.jl` respectively implement the algorithms AMP and Taylor-AMP described in the paper.
-* `experiments` : contains various experiments, the sub-folder `paper` contains the script used to produce the plots of the paper. The folder `misc` contains additional (undocumented) experiments.
+* `experiments` : contains various experiments, the sub-folder `paper` contains the script used to produce the plots of the paper. The folder `misc` contains additional (undocumented) experiments. The folder `python` contains Python code to compare with other methods implemented in Python.
+
+### External libraries 
+
+* The folder `homotopy_conformal_prediction` is from the repository [_Computing Full Conformal Prediction Set with Approximate Homotopy_](http://github.com/EugeneNdiaye/homotopy_conformal_prediction)
 
 # Usage
 

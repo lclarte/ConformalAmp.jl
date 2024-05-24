@@ -208,58 +208,6 @@ function get_confidence_interval(problem::RegressionProblem, X::AbstractMatrix, 
     return prediction_set
 end
 
-function get_confidence_interval(problem::RegressionProblem, X::AbstractMatrix, y::AbstractVector, xtest::AbstractVector, algo::FullConformal, method::ERMTaylor)
-    (; coverage, δy_range) = algo
-    n, d = size(X)
-    @assert size(xtest, 2) == 1
-    
-    α = 1.0 - coverage
-
-    # augment the dataset by adding xtest to X
-    X_augmented = vcat(X, xtest')
-    y_augmented = vcat(y, 0.0)
-
-    prediction_set = []
-
-    # the only goal of result₀ is to provide a 1st approximation of the output
-    result₀ = fit(problem, X, y, ERM())
-    ŷ = predict(problem, result₀, xtest)
-    
-    δy₀ = 0.01
-    y_augmented[end] = ŷ
-    Ŵ_1     = fit_leave_one_out(problem, X_augmented, y_augmented, ERM())
-    y_augmented[end] = ŷ + δy₀
-    Ŵ_2     = fit_leave_one_out(problem, X_augmented, y_augmented, ERM())
-    # we divide by δy_perturbation so that we only have to multiply by δy after
-    ΔŴ      = (1.0 / δy₀) * (Ŵ_2 - Ŵ_1)
-
-    # LOWER BOUND 
-    for δy in reverse(δy_range)
-        # Candidate label
-        y_augmented[end] = ŷ - δy
-        weights = Ŵ_1 - δy * ΔŴ
-        scores           = score(problem, diag(predict(problem, weights, X_augmented)), y_augmented)
-        # Compute the quantiles and add y to the interval if it's in the quantile
-        if scores[end] <= Statistics.quantile(scores[1:n], ceil(Int, coverage * (n+1)) / n)
-            push!(prediction_set, ŷ - δy)
-        end
-    end
-
-    # UPPER BOUND 
-    for δy in δy_range
-        # Candidate label
-        y_augmented[end] = ŷ + δy
-        weights = Ŵ_1 + δy * ΔŴ
-        scores           = score(problem, diag(predict(problem, weights, X_augmented)), y_augmented)
-        # Compute the quantiles and add y to the interval if it's in the quantile
-        if scores[end] <= Statistics.quantile(scores[1:n], ceil(Int, coverage * (n+1)) / n)
-            push!(prediction_set, ŷ + δy)
-        end
-    end
-
-    return prediction_set
-end
-
 # for classification problem
 
 function get_confidence_interval(problem::Logistic, X::AbstractMatrix, y::AbstractVector, xtest::AbstractVector, algo::FullConformal, method::Method)
