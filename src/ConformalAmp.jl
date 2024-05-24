@@ -13,8 +13,9 @@ include("bayesian_logistic_channel.jl")
 include("ridge_channel.jl")
 include("pinball_channel.jl")
 
-include("logistic_gamp.jl")
-include("lasso_gamp.jl")
+include("l1_prior.jl")
+include("l2_prior.jl")
+
 include("gamp.jl")
 
 include("data.jl")

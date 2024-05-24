@@ -102,69 +102,6 @@ function ∂Vchannel(y::AbstractVector, ω::AbstractVector, V::AbstractVector, p
     return RidgeChannel.∂Vgₒᵤₜ_and_∂V∂ωgₒᵤₜ(y, ω, V, ; rtol = rtol, Δ = problem.Δ̂)
 end
 
-function prior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Logistic, Pinball, BayesOptimalLogistic, BayesOptimalRidge})
-    """
-    For L2 penalty
-    """
-    (; λ) = problem
-    # We don't need to assert that λ = 1.0, if it's not we will just not have the Bayes optimal estimator
-    # if problem isa BayesOptimalLogistic || problem isa BayesOptimalRidge
-    #     @assert λ == 1.0
-    # end
-
-    return b ./ (λ .+ A), 1. ./ (λ .+ A)
-end
-
-function prior(b::AbstractVector, A::AbstractVector, problem::BayesOptimalLasso)
-    """
-    for l1 penalty
-    """
-    function ∂RlogZ(Σ::AbstractVector, R::AbstractVector, λ::Real)
-        # convert the Python code above in Julia
-        tmp = sqrt.(2.0 * Σ)
-        Rm, Rp = (R .- λ * Σ), (R .+ λ * Σ)
-        return - λ * (1.0 .+ erf.(Rm ./ tmp) - exp.(2 * R * λ) .* erfc.(Rp ./ tmp)) ./ (1.0 .+ erf.(Rm ./ tmp) .+ exp.(2.0 * λ * R) .* erfc.(Rp ./ tmp))
-    end
-
-    function ∂∂RlogZ(Σ::AbstractVector, R::AbstractVector, λ::Real)
-        """tmp = np.sqrt(2.0 * Sigma)
-        tmp_exp = np.exp(2 * R * lambda_)
-        tmp_pi = np.sqrt(2.0 / np.pi)
-        Rm, Rp = R - lambda_ * Sigma, R + lambda_ * Sigma
-        return 2 * lambda_ * tmp_exp * ( - np.exp(-Rp**2 / tmp**2) * tmp_pi + ( 2 * lambda_ * np.sqrt(Sigma) - tmp_pi * np.exp(-Rm**2 / tmp**2)) * erfc(Rp / tmp) + \
-                erf(Rm / tmp) * (2 * lambda_ * np.sqrt(Sigma) * erfc(Rp / tmp) - np.exp(-Rp**2 / tmp**2) * tmp_pi)) / \
-                (np.sqrt(Sigma) * (1.0 + erf(Rm / tmp) + tmp_exp * erfc(Rp / tmp) )**2)"""
-        tmp = sqrt.(2.0 * Σ)
-        tmp_exp = exp.(2 * R * λ)
-        tmp_pi = sqrt.(2.0 / π)
-        Rm, Rp = R .- λ * Σ, R .+ λ * Σ
-        return 2 * λ * tmp_exp .* ( - exp.(- Rp.^2 ./ tmp.^2) .* tmp_pi + ( 2 * λ * sqrt.(Σ) .- tmp_pi .* exp.(- Rm.^2 ./ tmp.^2)) .* erfc.(Rp ./ tmp) .+ 
-                erf.(Rm ./ tmp) .* (2 * λ * sqrt.(Σ) .* erfc.(Rp ./ tmp) .- exp.(- Rp.^2 ./ tmp.^2) .* tmp_pi)) ./ 
-                (sqrt.(Σ) .* (1.0 .+ erf.(Rm ./ tmp) .+ tmp_exp .* erfc.(Rp ./ tmp) ).^2)
-    end
-
-    Σ = 1.0 ./ A
-    R = b ./ A
-    fa = Σ .* ∂RlogZ(Σ, R, problem.λ) + R
-    fv = Σ.^2 .* ∂∂RlogZ(Σ, R, problem.λ) + Σ
-    return fa, fv
-end
-
-## derivatives of the prior for regression problem for Taylor-gamp
-# on pourrait inclure Logistic dedans mais ca servirait a rien
-
-function ∂bprior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Pinball})
-    (; λ) = problem
-
-    return (1 ./ A) ./ (λ ./ A .+ 1.0), zeros(size(b))
-end
-
-function ∂Aprior(b::AbstractVector, A::AbstractVector, problem::Union{Ridge, Pinball})
-    (; λ) = problem
-
-    return - b ./ (λ .+ A).^2., - 1.0 ./ (λ .+ A).^2.
-end
-
 ##
 
 ## 
@@ -329,6 +266,8 @@ function compute_order_one_perturbation_gamp(problem::RegressionProblem, X::Abst
 
     return GampResult(x̂ = Δx̂, v̂ = Δv̂, ω = Δω, V = ΔV, A = ΔA, b = Δb, g = Δg, dg = Δ∂g)
 end
+
+### get leave-one-out estimators as estimated by AMP
 
 function get_cavity_means_from_gamp(problem::Problem, X::AbstractMatrix, y::AbstractVector, xhat::AbstractVector, vhat::AbstractVector, ω::AbstractVector; rtol = 1e-3)
     """

@@ -1,3 +1,8 @@
+"""
+Script to compare the residuals given by exact leave-one-out and Taylor AMP. 
+The corresponding figure is in the appendix 
+"""
+
 using Plots
 using StableRNGs: StableRNG
 using Statistics
@@ -6,7 +11,7 @@ using ConformalAmp
 
 rng = StableRNG(0)
 
-d_range = [200, 500, 1000]
+d_range = [100, 200, 500]
 
 plt = plot()
 α = 0.5
@@ -39,4 +44,3 @@ for d in d_range
 end
 
 display(plt)
-savefig(plt, "plots/residuals_comparison_$problem.pdf")

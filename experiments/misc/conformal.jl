@@ -28,38 +28,6 @@ end
 
 ##
 
-function compare_jacknife_fcp_confidence_intervals()
-    # define the problem and sample the data
-    d   = 500
-    α = 0.5
-    λ = 1.0
-    coverage = 0.9
-
-    problem = ConformalAmp.Ridge(α = α, λ = λ, Δ = 1.0, Δ̂ = 1.0)
-
-    rng = StableRNG(0)
-
-    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
-
-    ntest = 100
-    xtest_array = ConformalAmp.sample_data_any_n(rng, d, ntest)
-
-    width_jacknife = []
-    width_fcp = []
-
-    for i in ProgressBar(1:ntest)
-        xtest = xtest_array[i, :]
-
-        jplus_confidence_set = ConformalAmp.get_confidence_interval(problem, X, y, xtest, ConformalAmp.JacknifePlus(coverage = coverage), ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4))
-        fcp_confidence_set = ConformalAmp.get_confidence_interval(problem, X, y, xtest, ConformalAmp.FullConformal(coverage = coverage, δy_range = 0:0.1:3.0), ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4))
-
-        push!(width_jacknife, maximum(jplus_confidence_set) - minimum(jplus_confidence_set))
-        push!(width_fcp, maximum(fcp_confidence_set) - minimum(fcp_confidence_set))
-    end
-
-    scatter(width_jacknife, width_fcp, title="Jacknife vs FCP", xaxis="Jacknife width", yaxis="FCP width")
-end
-
 #### 
 
 function compare_intervals_fcp_erm_gamptaylor(problem::ConformalAmp.Problem; d::Integer = 100, ntest::Integer = 10, seed::Integer = 0)

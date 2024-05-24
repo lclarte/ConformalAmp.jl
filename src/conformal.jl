@@ -7,10 +7,6 @@ abstract type UncertaintyAlgorithm end
     coverage::Float64
 end
 
-@kwdef struct JacknifePlus <: UncertaintyAlgorithm
-    coverage::Float64
-end
-
 @kwdef struct SplitConformal <: UncertaintyAlgorithm
     coverage::Float64
 end
@@ -37,26 +33,6 @@ end
 
 function score(::RegressionProblem, y::AbstractVector, ŷ::AbstractVector)
     return abs.(y - ŷ)
-end
-
-## for jacknife
-
-function get_confidence_interval(problem::RegressionProblem, X::AbstractMatrix, y::AbstractVector, xtest::AbstractVector, algorithm::JacknifePlus, method::Method)
-    # for jacknife, coverage = 1 - 2 * α
-    n, d = size(X)
-    # α = (1.0  - algorithm.coverage) / 2.0
-    # Taking this α below is not the correct thing to do BUT it seems to give the 
-    # coverage that I want 
-    α = 1.0  - algorithm.coverage
-
-    what_cavity = fit_leave_one_out(problem, X, y, method)
-    
-    # not optimal, the matrix multiplication is O(n^3)
-    training_residuals = diag(predict(problem, what_cavity, X)) - y
-    lower_bound        = predict(problem, what_cavity, xtest) - abs.(training_residuals)
-    upper_bound        = predict(problem, what_cavity, xtest) + abs.(training_residuals)
-
-    return Statistics.quantile(lower_bound, floor(Int, α * (n + 1)) / n), Statistics.quantile(upper_bound, floor(Int, (1 - α) * (n + 1)) / n)
 end
 
 # for full conformal prediction

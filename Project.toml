@@ -1,11 +1,13 @@
 name = "ConformalAmp"
 uuid = "26446836-9aa7-4a38-8fca-9679d6711715"
-authors = ["Lucas Clarte <lucas.clarte@epfl.ch>"]
 version = "0.1.0"
 
 [deps]
+<<<<<<< HEAD
 BootstrapAsymptotics = "d307ed22-b47c-43c3-8c4d-624c6f851e79"
 ConformalPrediction = "98bfc277-1877-43dc-819b-a3e38c30242f"
+=======
+>>>>>>> clean
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LogExpFunctions = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
