@@ -1,6 +1,5 @@
 name = "ConformalAmp"
 uuid = "26446836-9aa7-4a38-8fca-9679d6711715"
-authors = ["Lucas Clarte <lucas.clarte@epfl.ch>"]
 version = "0.1.0"
 
 [deps]

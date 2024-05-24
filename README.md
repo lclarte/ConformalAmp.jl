@@ -24,7 +24,7 @@ algo      = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)
 interval = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo, method)
 ```
 
-The parameters Δ, α are only used to generate synthetic datasets and are not required to compute estimators, Δ̂ is an estimation of the Gaussian noise in the square loss (we fix it at one in the paper) and λ is the regularisation level. To compute the confidence intervals exactly with our method, replace the line `algo      = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)` with `algo = ConformalAmp.ERM()`.
+The parameters Δ, α are only used to generate synthetic datasets and are not required to compute estimators, Δ̂ is an estimation of the Gaussian noise in the square loss (we fix it at one in the paper) and λ is the regularisation level. To compute the confidence intervals exactly with our method, replace the line `algo = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)` with `algo = ConformalAmp.ERM()`.
 
 ## Additional details
 
