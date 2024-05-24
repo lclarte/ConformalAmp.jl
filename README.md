@@ -4,10 +4,6 @@ This repository contains the Julia code used to reproduce the experiments of the
 
 The code is structured as follows:
 
-<<<<<<< HEAD
--`src`: contains the code for AMP and Taylor-AMP described in the paper, especially the file `gamp.jl`
-- `experiments` : contains various experiments, the sub-folder 
-=======
 * `src`: contains the code for AMP and Taylor-AMP described in the paper. In particular, the functions `gamp` and `compute_order_one_perturbation_gamp` in the file `gamp.jl` respectively implement the algorithms AMP and Taylor-AMP described in the paper.
 * `experiments` : contains various experiments, the sub-folder `paper` contains the script used to produce the plots of the paper. The folder `misc` contains additional (undocumented) experiments.
 
@@ -33,4 +29,3 @@ The parameters Δ, α are only used to generate synthetic datasets and are not r
 ## Additional details
 
 Unless otherwise specified, all confidence intervals in the numerics of the paper are given for a confidence level of 90%. In addition to the Ridge and Lasso regression cases studied in the paper, this code is able to compute leave-one-out estimators for the Logistic and Pinball (quantile regression) cases.
->>>>>>> clean
