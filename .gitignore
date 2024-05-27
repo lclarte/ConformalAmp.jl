@@ -1,3 +1,4 @@
 plots
 experiments/paper/*.pdf
 experiments/paper/*.png
+experiments/python/Lasso*

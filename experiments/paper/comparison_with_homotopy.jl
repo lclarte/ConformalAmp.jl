@@ -11,6 +11,7 @@ using Statistics
 
 α = 0.5
 λ = 1.0
+d = 250
 
 problem = ConformalAmp.Lasso(α = α, Δ = 1.0, λ = λ, Δ̂ = 1.0)
 coverage = 0.75 # only use this value ! Hardcoded in the Python library
@@ -20,8 +21,7 @@ compute_exact_fcp = false
 
 # generate the data
 
-function generate_data(problem, d::Integer, seed::Integer = 0)
-    ntest = 1000
+function generate_data(problem, d::Integer, seed::Integer = 0; ntest::Integer = 1000)
     rng = StableRNG(seed)
     
     
@@ -30,36 +30,36 @@ function generate_data(problem, d::Integer, seed::Integer = 0)
     ytest = ConformalAmp.sample_labels(rng, problem, Xtest, w)
     
     # create the folder experiments/python/$prolem if it doesn't exist
-    if !isdir("experiments/python/$problem")
-        mkdir("experiments/python/$problem")
+    if !isdir("experiments/python/$(problem)_$d")
+        mkdir("experiments/python/$(problem)_$d")
     end
 
-    npzwrite("experiments/python/$problem/X.npy", X)
-    npzwrite("experiments/python/$problem/w.npy", w)
-    npzwrite("experiments/python/$problem/y.npy", y)
-    npzwrite("experiments/python/$problem/Xtest.npy", Xtest)
-    npzwrite("experiments/python/$problem/ytest.npy", ytest)
+    npzwrite("experiments/python/$(problem)_$d/X.npy", X)
+    npzwrite("experiments/python/$(problem)_$d/w.npy", w)
+    npzwrite("experiments/python/$(problem)_$d/y.npy", y)
+    npzwrite("experiments/python/$(problem)_$d/Xtest.npy", Xtest)
+    npzwrite("experiments/python/$(problem)_$d/ytest.npy", ytest)
 
     return X, w, y, Xtest, ytest
 end
 
-X, y, w, Xtest, ytest = generate_data(problem, d)
+X, y, w, Xtest, ytest = generate_data(problem, d, ntest = 10)
 
-function load_data(problem)
-    X = npzread("experiments/python/$problem/X.npy")
-    w = npzread("experiments/python/$problem/w.npy")
-    y = npzread("experiments/python/$problem/y.npy")
-    Xtest = npzread("experiments/python/$problem/Xtest.npy")
-    ytest = npzread("experiments/python/$problem/ytest.npy")
+function load_data(problem, d)
+    X = npzread("experiments/python/$(problem)_$d/X.npy")
+    w = npzread("experiments/python/$(problem)_$d/w.npy")
+    y = npzread("experiments/python/$(problem)_$d/y.npy")
+    Xtest = npzread("experiments/python/$(problem)_$d/Xtest.npy")
+    ytest = npzread("experiments/python/$(problem)_$d/ytest.npy")
 
-    homotopy_intervals = npzread("experiments/python/$problem/homotopy_intervals.npy")
+    homotopy_intervals = npzread("experiments/python/$(problem)_$d/homotopy_intervals.npy")
     
     return X, w, y, Xtest, ytest, homotopy_intervals
 end
 
 # ===================================LOAD THE DATA ================================================
 
-X, w, y, Xtest, ytest, homotopy_intervals = load_data(problem)
+X, w, y, Xtest, ytest, homotopy_intervals = load_data(problem, d)
 ntest = size(Xtest, 1)
 
 # =========================COMPUTE THE INTERVALS EXACTLY ===========================================

@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 import homotopy_conformal_prediction.approx_conformal_prediction as acp
 
-folder = "Lasso(Δ = 1.0, Δ̂ = 1.0, λ = 1.0, α = 0.5)"
+folder = "Lasso(Δ = 1.0, Δ̂ = 1.0, λ = 1.0, α = 0.5)_250"
 
 X     = np.load(f"{folder}/X.npy")
 y     = np.load(f"{folder}/y.npy")
@@ -36,3 +36,8 @@ for i, x in tqdm(enumerate(Xtest)):
 # save the prediction intervals
 np.save(f"{folder}/homotopy_intervals.npy", intervals)
 print("Mean time is ", np.mean(times), " seconds.")
+
+# append the mean time to the file homotopy_times.csv
+# 1st col. of the csv is the folder name, 2nd col. is the mean time
+with open("homotopy_times.csv", "a") as f:
+    f.write(f"\"{folder}\",{np.mean(times)}\n")
