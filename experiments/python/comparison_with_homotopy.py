@@ -4,7 +4,12 @@ from tqdm import tqdm
 
 import homotopy_conformal_prediction.approx_conformal_prediction as acp
 
-folder = "Lasso(Δ = 1.0, Δ̂ = 1.0, λ = 1.0, α = 0.5)_250"
+# below, take the folder name as a command line argument 
+
+import sys
+# example : folder = "Lasso(Δ = 1.0, Δ̂ = 1.0, λ = 1.0, α = 0.5)_150"
+folder = sys.argv[1]
+
 
 X     = np.load(f"{folder}/X.npy")
 y     = np.load(f"{folder}/y.npy")
@@ -22,6 +27,8 @@ y_range = np.min(y[:-1]), np.max(y[:-1])
 # store the lower and upper bound of prediction intervals
 intervals = np.zeros((len(Xtest), 2))
 times = []
+
+print("Total number of test samples: ", len(Xtest))
 
 for i, x in tqdm(enumerate(Xtest)):
     X_augmented = np.vstack((X, x))

@@ -2,3 +2,8 @@ plots
 experiments/paper/*.pdf
 experiments/paper/*.png
 experiments/python/Lasso*
+experiments/python/exact_lasso_homotopy/
+experiments/python/comparison_with_exact_lasso_homotopy.py
+experiments/python/.Rhistory
+experiments/python/.RData
+experiments/python/.DS_Store

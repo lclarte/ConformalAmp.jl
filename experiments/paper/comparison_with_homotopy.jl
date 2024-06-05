@@ -14,7 +14,7 @@ using Statistics
 d = 250
 
 problem = ConformalAmp.Lasso(α = α, Δ = 1.0, λ = λ, Δ̂ = 1.0)
-coverage = 0.75 # only use this value ! Hardcoded in the Python library
+coverage = 0.9 # only use this value 0.9 ! Hardcoded in the Python library
 fcp = ConformalAmp.FullConformal(coverage = coverage, δy_range = 0.0:0.05:5.0)
 
 compute_exact_fcp = false
@@ -43,7 +43,8 @@ function generate_data(problem, d::Integer, seed::Integer = 0; ntest::Integer = 
     return X, w, y, Xtest, ytest
 end
 
-X, y, w, Xtest, ytest = generate_data(problem, d, ntest = 10)
+ntest = 100
+X, w, y, Xtest, ytest = generate_data(problem, d, ntest = ntest)
 
 function load_data(problem, d)
     X = npzread("experiments/python/$(problem)_$d/X.npy")
