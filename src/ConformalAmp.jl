@@ -22,5 +22,6 @@ include("data.jl")
 include("fit.jl")
 include("conformal.jl")
 include("splitconformal.jl")
+include("conformalquantile.jl")
 
 end # module ConformalAmp

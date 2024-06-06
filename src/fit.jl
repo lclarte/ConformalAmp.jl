@@ -48,8 +48,9 @@ function fit(problem::Pinball, X::AbstractMatrix, y::AbstractVector, ::ERM)
     https://juliaai.github.io/MLJLinearModels.jl/dev/api/#MLJLinearModels.QuantileRegression
     with an intercept, the intercept is the LAST ELEMENT OF THE VECTOR RETURNED
     """
+    n, d = size(X)
     model = MLJLinearModels.QuantileRegression(
-        ; delta = problem.q, lambda = problem.λ, gamma = 0.0, fit_intercept = problem.use_bias, scale_penalty_with_samples = false, penalize_intercept = false
+        ; delta = problem.q, lambda = problem.λ / n, gamma = 0.0, fit_intercept = problem.use_bias, scale_penalty_with_samples = false, penalize_intercept = false
     )
     return MLJLinearModels.fit(model, X, y)
 end
