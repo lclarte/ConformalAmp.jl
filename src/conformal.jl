@@ -242,3 +242,9 @@ function get_confidence_interval(problem::Union{Ridge, Lasso}, X::AbstractMatrix
 
     return (predict(problem, ŵ, xtest) - q, predict(problem, ŵ, xtest) + q)
 end
+
+function get_confidence_interval(problem::Union{Ridge, Lasso}, X::AbstractMatrix, y::AbstractVector, xtest::AbstractMatrix, algo::SplitConformal, method::Method)
+    ŵ, q = split_conformal(problem, X, y, algo.coverage)
+
+    return (predict(problem, ŵ, xtest) .- q, predict(problem, ŵ, xtest) .+ q)
+end
