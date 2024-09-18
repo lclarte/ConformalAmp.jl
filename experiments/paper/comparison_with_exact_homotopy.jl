@@ -15,13 +15,13 @@ n = 200
 α = n / d
 
 w = zeros(d)
-# sample randomly the first 
-w[1:5] = 8 * (2 * rand(5) .- 1)
+# sample randomly the first 5 elements of w from the rademacher distribution
+w[1:5] = 8 * (2 * rand(rng, 0:1, 5) .- 1)
 
-λ = 0.13 # taken from the R code of the paper
+λ = 1.0  # the valuer 0.13 is aken from the R code of the paper
 problem = ConformalAmp.Ridge(α = α, λ = λ, Δ = 1.0, Δ̂ = 1.0)
 
-fcp = ConformalAmp.FullConformal(coverage = 0.9, δy_range = 0.0:0.025:2.5)
+fcp = ConformalAmp.FullConformal(coverage = 0.9, δy_range = 0.0:0.01:2.5)
 
 coverages = []
 mean_lengths = []
@@ -33,7 +33,7 @@ for i in ProgressBar(1:100)
 
     X = ConformalAmp.sample_data_any_n(rng, d, n)
     y = X * w + randn(n)
-    Xtest = ConformalAmp.sample_data_any_n(rng, d, ntest)
+    Xtest = ConformalAmp.sample_data_any_n(rng, d, ntest) .* sqrt(d)
     ytest = Xtest * w + randn(ntest)
     for x in (eachrow(Xtest))
         interval = ConformalAmp.get_confidence_interval(problem, X, y, x, fcp, ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4))

@@ -2,6 +2,7 @@
 Plot to compute the jaccard index between exact FCP and AMPTaylor, as well as split conformal prediction
 """
 
+using Plots
 using ProgressBars
 using StableRNGs: StableRNG
 using Statistics
@@ -14,15 +15,16 @@ function jaccard_index(a1::Real, b1::Real, a2::Real, b2::Real)
     return intersection / union
 end
 
-function compute_jaccard_amp_scp(problem::ConformalAmp.Problem; d::Integer = 100, ntest::Integer = 10, seed::Integer = 0)
+function compute_jaccard_amp_scp(problem::ConformalAmp.Problem; d::Integer = 100, ntest::Integer = 10, seed::Integer = 0, model::String = "gaussian")
     """
     Compare the confidence interval given by ERM() so by refitting everything and GAMPTaylor for a
     single test point at a fixed dimension
     """
     rng = StableRNG(seed)
 
-    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
-    xtest_array = ConformalAmp.sample_data_any_n(rng, d, ntest)
+    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d, model = model)
+
+    xtest_array = ConformalAmp.sample_data_any_n(rng, d, ntest, model = model)
 
     algo = ConformalAmp.FullConformal(δy_range = 0.0:0.05:5.0, coverage = 0.9)
     scp_algo = ConformalAmp.SplitConformal(coverage = 0.9)
@@ -43,6 +45,7 @@ function compute_jaccard_amp_scp(problem::ConformalAmp.Problem; d::Integer = 100
         push!(jaccard_list_erm_amptaylor, jaccard_amp)
         push!(jaccard_list_erm_scp, jaccard_scp)
     end
+
     return jaccard_list_erm_amptaylor, jaccard_list_erm_scp
 end
 
@@ -56,7 +59,8 @@ problems = [
 ]
 
 for problem in problems
-    jaccard_list_erm_amptaylor, jaccard_list_erm_scp = compute_jaccard_amp_scp(problem; d=d, ntest=50, seed=0)
+    λ = problem.λ
+    jaccard_list_erm_amptaylor, jaccard_list_erm_scp = compute_jaccard_amp_scp(problem; d=d, ntest=50, seed=0, model="laplace")
 
     println("Mean for $problem : $(mean(jaccard_list_erm_amptaylor)), $(mean(jaccard_list_erm_scp))")
     # print standard deviation
