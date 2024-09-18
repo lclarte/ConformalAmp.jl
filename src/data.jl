@@ -6,17 +6,48 @@ using Distributions
 using StableRNGs: AbstractRNG
 using LogExpFunctions
 
+# ===== for gauss-bernoulli model =====
+
+function sample_bernoulli_gauss(rng::AbstractRNG, p::Real)
+    if rand(rng) < p
+        return 0.0
+    else
+        return rand(rng, Normal(0, 1))
+    end
+end
+
+# sampe a n x d matrix with a bernoulli-gaussian model
+function sample_bernoulli_gauss_matrix(rng::AbstractRNG, n::Integer, d::Integer, p::Real)
+    X = zeros(n, d)
+    for i in 1:n
+        for j in 1:d
+            X[i, j] = sample_bernoulli_gauss(rng, p)
+        end
+    end
+    return X
+end
+
+### 
+
 function get_n(α::Real, d::Integer)
     return ceil(Int, α * d)
 end
 
-function sample_data(rng::AbstractRNG, problem::Problem, d::Integer)
+function sample_data(rng::AbstractRNG, problem::Problem, d::Integer; model::String = "gaussian")
     n = get_n(problem.α, d)
-    return sample_data_any_n(rng, d, n)
+    return sample_data_any_n(rng, d, n; model = model)
 end
 
-function sample_data_any_n(rng::AbstractRNG, d::Integer, n::Integer)
-    X = randn(rng, n, d) ./ sqrt(d)
+function sample_data_any_n(rng::AbstractRNG, d::Integer, n::Integer; model = "gaussian")
+    if model == "gaussian"
+        X = randn(rng, n, d) ./ sqrt(d)
+    elseif model == "laplace"
+        X = rand(rng, Laplace(0.0, 1.0), n, d) ./ sqrt(d)
+    elseif model == "bernoulli-gauss"
+        X = sample_bernoulli_gauss_matrix(rng, n, d, 0.5)
+    else
+        throw("Model not recognized")
+    end
     return X
 end
 
@@ -43,8 +74,8 @@ function sample_labels(rng::AbstractRNG, problem::RegressionProblem, X::Abstract
     return y
 end
 
-function sample_all(rng::AbstractRNG, problem::Problem, d::Integer)
-    X = sample_data(rng, problem, d)
+function sample_all(rng::AbstractRNG, problem::Problem, d::Integer; model::String = "gaussian")
+    X = sample_data(rng, problem, d; model = model)
     w = sample_weights(rng, problem, d)
     y = sample_labels(rng, problem, X, w)
     return (; X, w, y)

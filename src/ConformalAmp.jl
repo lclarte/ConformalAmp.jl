@@ -23,5 +23,6 @@ include("fit.jl")
 include("conformal.jl")
 include("splitconformal.jl")
 include("conformalquantile.jl")
+include("vamp.jl")
 
 end # module ConformalAmp
