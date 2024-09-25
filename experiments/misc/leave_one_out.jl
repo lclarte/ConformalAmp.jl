@@ -30,8 +30,8 @@ function compare_gamp_erm(model::String, d::Integer)
     (; x̂, v̂, ω) = ConformalAmp.gamp(problem, X, y; rtol=1e-5)
     x̂_cavities = ConformalAmp.get_cavity_means_from_gamp(problem, X, y, x̂, v̂, ω)
 
-    x̂_loo = ConformalAmp.fit_leave_one_out(problem, X, y)
-    x̂     = ConformalAmp.fit(problem, X, y)
+    x̂_loo = ConformalAmp.fit_leave_one_out(problem, X, y, ConformalAmp.ERM())
+    x̂     = ConformalAmp.fit(problem, X, y, ConformalAmp.ERM())
 
     index = 1
 
@@ -353,4 +353,4 @@ seed = 10
 
 # plot_histogram_weights_label_change_wrt_d(ConformalAmp.Ridge(α = 0.5, Δ = 1.0, λ = λ, Δ̂ = 1.0), Vector{Int}(500:500:2000), 5.0)
 
-@time compare_fcp_interpolation("ridge", 200)
+compare_gamp_erm("ridge", 500)

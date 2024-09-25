@@ -208,6 +208,59 @@ function get_confidence_interval(problem::RegressionProblem, X::AbstractMatrix, 
     return prediction_set
 end
 
+function get_confidence_interval(problem::Union{Ridge, Lasso}, X::AbstractMatrix, y::AbstractVector, xtest::AbstractVector, algo::FullConformal, method::VAMP)
+    """
+    With GAMPTaylor, we only need to fit twice gamp, one for gamp and one for the derivative, then at each y 
+    we just have to to an matrix multilplication to get the new scores
+    """
+    (; coverage, δy_range) = algo
+    n, d = size(X)
+    @assert size(xtest, 2) == 1
+    
+    α = 1.0 - coverage
+
+    # augment the dataset by adding xtest to X
+    X_augmented = vcat(X, xtest')
+    y_augmented = vcat(y, 0.0)
+
+    prediction_set = []
+
+    ŵ = fit(problem, X, y, method)
+    ŷ = predict(problem, ŵ, xtest)
+
+    # LOWER BOUND 
+    for δy in δy_range
+        # Candidate label
+        y_augmented[n+1] = ŷ - δy
+        # Compute the score for all n samples by 1) computing the leave-one-out and corresponding score
+        weights          = fit_leave_one_out(problem, X_augmented, y_augmented, method)
+        scores           = score(problem, diag(predict(problem, weights, X_augmented)), y_augmented)
+        # Compute the quantiles and add y to the interval if it's in the quantile
+        if scores[n+1] <= Statistics.quantile(scores[1:n], ceil(Int, coverage * (n+1)) / n)
+            push!(prediction_set, ŷ - δy)
+        else # the confidence set is an interval so we can stop as soon as we don't add the value of y
+            break
+        end
+    end
+
+    # UPPER BOUND 
+    for δy in δy_range
+        # Candidate label
+        y_augmented[n+1] = ŷ + δy
+        # Compute the score for all n samples by 1) computing the leave-one-out and corresponding score
+        weights          = fit_leave_one_out(problem, X_augmented, y_augmented, method)
+        scores           = score(problem, diag(predict(problem, weights, X_augmented)), y_augmented)
+        # Compute the quantiles and add y to the interval if it's in the quantile
+        if scores[n+1] <= Statistics.quantile(scores[1:n], ceil(Int, coverage * (n+1)) / n)
+            push!(prediction_set, ŷ + δy)
+        else # the confidence set is an interval so we can stop as soon as we don't add the value of y
+            break
+        end
+    end
+
+    return prediction_set
+end
+
 # for classification problem
 
 function get_confidence_interval(problem::Logistic, X::AbstractMatrix, y::AbstractVector, xtest::AbstractVector, algo::FullConformal, method::Method)
@@ -248,3 +301,4 @@ function get_confidence_interval(problem::Union{Ridge, Lasso}, X::AbstractMatrix
 
     return (predict(problem, ŵ, xtest) .- q, predict(problem, ŵ, xtest) .+ q)
 end
+
