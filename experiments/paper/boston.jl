@@ -39,6 +39,7 @@ ci_gamp_list = []
 fcp = ConformalAmp.FullConformal(δy_range = 0.0:0.1:5.0, coverage = coverage)
 gamp_time_list = []
 
+# COMMENT THE LINE DEPENDING ON WHICH ALGORITHM YOU WANT TO USE
 # method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)
 method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4)
 
