@@ -182,11 +182,11 @@ function get_confidence_interval(problem::RegressionProblem, X::AbstractMatrix, 
     ΔŴ      = get_derivative_cavity_means(X_augmented, result, Δresult)
 
     # LOWER BOUND 
-    for δy in reverse(δy_range)
+    for δy in δy_range
         # Candidate label
         y_augmented[end] = ŷ - δy
         weights = Ŵ_0 - δy * ΔŴ
-        scores           = score(problem, diag(predict(problem, weights, X_augmented)), y_augmented)
+        scores  = score(problem, diag(predict(problem, weights, X_augmented)), y_augmented)
         # Compute the quantiles and add y to the interval if it's in the quantile
         if scores[end] <= Statistics.quantile(scores[1:n], ceil(Int, coverage * (n+1)) / n)
             push!(prediction_set, ŷ - δy)
@@ -198,7 +198,7 @@ function get_confidence_interval(problem::RegressionProblem, X::AbstractMatrix, 
         # Candidate label
         y_augmented[end] = ŷ + δy
         weights = Ŵ_0 + δy * ΔŴ
-        scores           = score(problem, diag(predict(problem, weights, X_augmented)), y_augmented)
+        scores  = score(problem, diag(predict(problem, weights, X_augmented)), y_augmented)
         # Compute the quantiles and add y to the interval if it's in the quantile
         if scores[end] <= Statistics.quantile(scores[1:n], ceil(Int, coverage * (n+1)) / n)
             push!(prediction_set, ŷ + δy)

@@ -35,10 +35,9 @@ function compute_coverage_gamp_taylor(problem::ConformalAmp.Problem; d::Integer 
     return total_covered / ntest
 end
 
-function experiment_coverage(problem::ConformalAmp.Problem, nseeds::Integer = 10, coverage::Real = 0.9; model::String = "gaussian")
+function experiment_coverage(problem::ConformalAmp.Problem, nseeds::Integer = 10, coverage::Real = 0.9, d_list::AbstractArray = [100, 200]; model::String = "gaussian")
     mean_coverages_gamp = []
     mean_time_gamp = []
-    d_list = [100, 200]
     
     for d in d_list
         coverages_gamp = []
@@ -60,20 +59,20 @@ end
 
 problems = [
     ConformalAmp.Ridge(α = 0.5, λ = 0.1, Δ = 1.0, Δ̂ = 1.0),
-    ConformalAmp.Ridge(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0),
-    # ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
+    # ConformalAmp.Ridge(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0),
+    ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
     # ConformalAmp.Lasso(α = 0.5, λ = 0.1, Δ = 1.0, Δ̂ = 1.0),
 ]
 coverage = 0.9
 
 fs = 12
 
-d_list = [100, 200]
+d_list = [100, 250, 500]
 plt = plot(d_list, coverage * ones(length(d_list)), label="", color=:black, xaxis="d", yaxis="coverage", legend=:topright,
 xtickfontsize=fs,ytickfontsize=fs, legendfontsize=fs)
 
 for problem in problems
-    d_list, mean_coverages_gamp, mean_time_gamp = experiment_coverage(problem, 1000, coverage; model = "laplace")
+    d_list, mean_coverages_gamp, mean_time_gamp = experiment_coverage(problem, 100, coverage, d_list; model = "laplace")
     scatter!(plt, d_list, mean_coverages_gamp, label="$problem")
 
 end

@@ -243,12 +243,10 @@ function compute_order_one_perturbation_gamp(problem::RegressionProblem, X::Abst
     The idea is to use the convergence of GAMP algo and iterate over Δx̂, Δv̂, ΔV and Δω until convergence. the Δw returned is for δy = 1 
     By convention, we'll assume the last sample sees its label changed
     """
+    step = 0.5
     n, d = size(X)
-    (; x̂, v̂, ω, V, A, b) = result
-    g, ∂g = channel(y, ω, V, problem; rtol = rtol)
+    (; x̂, v̂, ω, V, A, b, g, dg) = result
 
-    
-    
     X_squared = X .* X
     Δx̂, Δv̂ = zeros(d), zeros(d)
     ΔA, Δb = zeros(d), zeros(d)
@@ -263,17 +261,31 @@ function compute_order_one_perturbation_gamp(problem::RegressionProblem, X::Abst
     ∂bprior_ = ∂bprior(b, A, problem)
     ∂Aprior_ = ∂Aprior(b, A, problem)
 
+    F = svd(X)
+    # get the singular values 
+    Σ = F.S
+
     for iteration in 1:max_iter
-        ΔV = X_squared * Δv̂ # OK
-        Δω = X * Δx̂ - ΔV .* g - V .* Δg # OK
+        ΔV_new = (sum(Σ.^2) * mean(Δv̂) / n) * ones(n)
+        # ΔV = X_squared * Δv̂ # OK # Old version that may not work for non i.i.d data
+        Δω_new = X * Δx̂ - ΔV_new .* g - V .* Δg # OK
+
+        if iteration > 1
+            ΔV = ΔV_new * step + ΔV * (1 - step) #
+            Δω = Δω_new * step + ΔV * (1 - step) #
+        else
+            ΔV = copy(ΔV_new)
+            Δω = copy(Δω_new)
+        end
 
         Δg, Δ∂g = ∂ωchannel_[1] .* Δω + ∂Vchannel_[1] .* ΔV, ∂ωchannel_[2] .* Δω + ∂Vchannel_[2] .* ΔV # OK, TO TEST 
 
         Δg[n] += ∂ychannel_[1]
         Δ∂g[n]+= ∂ychannel_[2]
 
-        ΔA = - (X_squared)' * Δ∂g # OK
-        Δb = X' * Δg + A .* Δx̂ + ΔA .* x̂ # OK
+        # ΔA = - (X_squared)' * Δ∂g # OK
+        ΔA_new = - (sum(Σ.^2) * mean(Δ∂g) / d) * ones(d)
+        Δb_new = X' * Δg + A .* Δx̂ + ΔA_new .* x̂ # OK
 
         Δx̂_old = copy(Δx̂)
 
@@ -290,18 +302,18 @@ end
 
 ### get leave-one-out estimators as estimated by AMP
 
-function get_cavity_means_from_gamp(problem::Problem, X::AbstractMatrix, y::AbstractVector, xhat::AbstractVector, vhat::AbstractVector, ω::AbstractVector; rtol = 1e-3)
-    """
-    return a matrix n x d such that the i-th row is the estimator where the i-th sample has been removed 
-    """
-    Xsquared = X .* X
-    n, d     = size(X)
-
-    xhat_tiled  = repeat(xhat', n, 1)
-    V = Xsquared * vhat
-    gout, dgout = channel(y, ω, V, problem, rtol = rtol)
-    return xhat_tiled - X .* (vhat * gout')'
-end
+# function get_cavity_means_from_gamp(problem::Problem, X::AbstractMatrix, y::AbstractVector, xhat::AbstractVector, vhat::AbstractVector, ω::AbstractVector; rtol = 1e-3)
+#     """
+#     return a matrix n x d such that the i-th row is the estimator where the i-th sample has been removed 
+#     """
+#     Xsquared = X .* X
+#     n, d     = size(X)
+# 
+#     xhat_tiled  = repeat(xhat', n, 1)
+#     V = Xsquared * vhat
+#     gout, dgout = channel(y, ω, V, problem, rtol = rtol)
+#     return xhat_tiled - X .* (vhat * gout')'
+# end
 
 function get_cavity_means_from_gamp(X::AbstractMatrix, result::GampResult)
     n, _ = size(X)

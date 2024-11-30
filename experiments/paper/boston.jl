@@ -39,10 +39,15 @@ ci_gamp_list = []
 fcp = ConformalAmp.FullConformal(δy_range = 0.0:0.1:5.0, coverage = coverage)
 gamp_time_list = []
 
+# method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)
+method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4)
+
+println("Using method : $method")
+
 for i in 1:n_test
     # compute the confidencei ntervals 
     debut = time()
-    ci_gamp = ConformalAmp.get_confidence_interval(problem, x_train, y_train, x_test[i, :], fcp, ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4))
+    ci_gamp = ConformalAmp.get_confidence_interval(problem, x_train, y_train, x_test[i, :], fcp, method)
     fin = time()
     push!(ci_gamp_list, (minimum(ci_gamp), maximum(ci_gamp)))
     push!(gamp_time_list, fin - debut)
