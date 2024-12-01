@@ -2,7 +2,7 @@ This repository contains the Julia code used to reproduce the experiments of the
 
 # Reproducing the experiments 
 
-* Running the scripts `boston.jl` and `riboflavin.jl` reproduce the results of Table 4 for real data in the paper. For a comparison with approximate homotopy, you can run the files `python/homotopy_boston.py` and `python/homotopy_riboflavin.py`. 
+* Running the scripts `experiments/paper/boston.jl` and `experiments/paper/riboflavin.jl` reproduce the results of Table 4 for real data in the paper. For a comparison with approximate homotopy, you can run the files `python/homotopy_boston.py` and `python/homotopy_riboflavin.py`. 
 
 # General structure 
 
@@ -22,17 +22,22 @@ Consider training dataset `X, y` and a test vector `xtest`. The following code s
 ```
 using ConformalAmp
 
+# parameters α and Δ are not used in the computations yet 
 problem = ConformalAmp.Ridge(Δ = 1.0, Δ̂ = 1.0, λ = 1.0, α = 1.0)
 # alternatively do Lasso regression
+problem = ConformalAmp.Lasso(Δ = 1.0, Δ̂ = 1.0, λ = 1.0, α = 1.0)
 
 # define the method to use : either full or split conformal prediction
-conformal = ConformalAmp.FullConformal(coverage = coverage, δy_range = -0.0:0.05:5.0)
+conformal = ConformalAmp.FullConformal(coverage = coverage, δy_range = 0.0:0.05:5.0)
 algo      = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)
+# algo      = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4)
 
 interval = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo, method)
 ```
 
-The parameters Δ, α are only used to generate synthetic datasets and are not required to compute estimators, Δ̂ is an estimation of the Gaussian noise in the square loss (we fix it at one in the paper) and λ is the regularisation level. To compute the confidence intervals exactly with our method, replace the line `algo = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)` with `algo = ConformalAmp.ERM()`.
+The parameters Δ, α are only used to generate synthetic datasets and are not required to compute estimators, Δ̂ is an estimation of the Gaussian noise in the square loss (we fix it at 1.0 in the paper) and λ is the regularisation level. To compute the confidence intervals exactly with our method, replace the line `algo = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)` with `algo = ConformalAmp.ERM()`.
+
+Note that the input `X` of size `n \times d` should be centered (0 mean) and have scale `~ 1 / sqrt(d)` for the algorithm to converge.
 
 ## Additional details
 
