@@ -30,11 +30,11 @@ n_test = n - n_train
 
 coverage = 0.9
 
-fcp = ConformalAmp.FullConformal(δy_range = 0.0:0.05:7.5, coverage = coverage)
+fcp = ConformalAmp.FullConformal(δy_range = 0.0:0.1:5.0, coverage = coverage)
 
 # COMMENT THE LINE DEPENDING ON WHICH ALGORITHM YOU WANT TO USE
-# method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-5)
-method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4)
+method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)
+# method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4)
 
 println("Using method : $method")
 
@@ -42,7 +42,7 @@ coverage_gamp_list = []
 mean_length_gamp_list = []
 gamp_time_list = []
 
-seeds = 5
+seeds = 20
 
 for seed in ProgressBar(1:seeds)
     ci_gamp_list = []
@@ -73,7 +73,6 @@ for seed in ProgressBar(1:seeds)
 
     push!(coverage_gamp_list, coverage_gamp)
     push!(mean_length_gamp_list, mean_length_gamp)
-    print("Coverage of GAMP : ", coverage_gamp, " ± ", mean_length_gamp)
 end
 
 println("Coverage of GAMP : ", mean(coverage_gamp_list), " ± ", std(coverage_gamp_list))

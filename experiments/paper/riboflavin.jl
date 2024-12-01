@@ -11,6 +11,7 @@ using ConformalAmp
 
 data = CSV.read("experiments/paper/riboflavin.csv", DataFrame)
 X = data[:, 2:end]
+println("Shape of the data : ", size(X))
 y = data[:, 1]
 
 # normalize the data
@@ -47,7 +48,7 @@ method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)
 # method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5)
 println("Using method : $method")
 
-seeds = 30
+seeds = 20
 for seed in ProgressBar(1:seeds)
     Random.seed!(seed)
     idx = shuffle(1:size(X, 1))
@@ -60,7 +61,7 @@ for seed in ProgressBar(1:seeds)
 
     ci_list_gamp = []
 
-    fcp =  ConformalAmp.FullConformal(δy_range = 0.0:0.02:5.0, coverage = coverage)
+    fcp = ConformalAmp.FullConformal(δy_range = 0.0:0.1:5.0, coverage = coverage)
 
     for x in (eachrow(X_test))
         debut = time()
