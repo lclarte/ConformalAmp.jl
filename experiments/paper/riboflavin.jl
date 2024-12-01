@@ -47,7 +47,8 @@ method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)
 # method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5)
 println("Using method : $method")
 
-for seed in ProgressBar(1:10)
+seeds = 30
+for seed in ProgressBar(1:seeds)
     Random.seed!(seed)
     idx = shuffle(1:size(X, 1))
     X = X[idx, :]

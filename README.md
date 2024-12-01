@@ -1,5 +1,9 @@
 This repository contains the Julia code used to reproduce the experiments of the paper "Building Conformal Prediction Intervals with Approximate Message Passing". The dependencies are listed in the `Project.toml` file.
 
+# Reproducing the experiments 
+
+* Running the scripts `boston.jl` and `riboflavin.jl` reproduce the results of Table 4 for real data in the paper. For a comparison with approximate homotopy, you can run the files `python/homotopy_boston.py` and `python/homotopy_riboflavin.py`. 
+
 # General structure 
 
 The code is structured as follows:
