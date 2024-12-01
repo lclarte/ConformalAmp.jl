@@ -9,15 +9,15 @@ using ProgressBars
 using StableRNGs: StableRNG
 using Statistics
 
-function compute_coverage_gamp_taylor(problem::ConformalAmp.Problem; d::Integer = 100, ntest::Integer = 10, rng_seed::Integer = 0, coverage::Real = 0.9)
+function compute_coverage_gamp_taylor(problem::ConformalAmp.Problem; d::Integer = 100, ntest::Integer = 10, rng_seed::Integer = 0, coverage::Real = 0.9, model::String = "gaussian")
     """
     We don't need to compute the coverage of ERM since we know that it's correct, the priority is to compute the one of
     GAMP Taylor
     """
     rng = StableRNG(rng_seed)
 
-    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d)
-    xtest   = ConformalAmp.sample_data_any_n(rng, d, ntest)
+    (; X, w, y) = ConformalAmp.sample_all(rng, problem, d, model = model)
+    xtest   = ConformalAmp.sample_data_any_n(rng, d, ntest, model = model)
     ytest   = ConformalAmp.sample_labels(rng, problem, xtest, w)
 
     algo = ConformalAmp.FullConformal(coverage = coverage, δy_range = -0.0:0.05:5.0)
@@ -35,10 +35,9 @@ function compute_coverage_gamp_taylor(problem::ConformalAmp.Problem; d::Integer 
     return total_covered / ntest
 end
 
-function experiment_coverage(problem::ConformalAmp.Problem, nseeds::Integer = 10, coverage::Real = 0.9)
+function experiment_coverage(problem::ConformalAmp.Problem, nseeds::Integer = 10, coverage::Real = 0.9, d_list::AbstractArray = [100, 200]; model::String = "gaussian")
     mean_coverages_gamp = []
     mean_time_gamp = []
-    d_list = [100, 200]
     
     for d in d_list
         coverages_gamp = []
@@ -46,7 +45,7 @@ function experiment_coverage(problem::ConformalAmp.Problem, nseeds::Integer = 10
         times_gamp = []
 
         for seed in ProgressBar(1:nseeds)
-            timed_result_gamp = @timed compute_coverage_gamp_taylor(problem; d = d, ntest = 1, rng_seed = seed, coverage = coverage)
+            timed_result_gamp = @timed compute_coverage_gamp_taylor(problem; d = d, ntest = 1, rng_seed = seed, coverage = coverage, model = model)
             push!(coverages_gamp, timed_result_gamp[1])
             push!(times_gamp, timed_result_gamp[2])
         end
@@ -60,20 +59,20 @@ end
 
 problems = [
     ConformalAmp.Ridge(α = 0.5, λ = 0.1, Δ = 1.0, Δ̂ = 1.0),
-    ConformalAmp.Ridge(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0),
-    ConformalAmp.Lasso(α = 0.5, λ = 0.1, Δ = 1.0, Δ̂ = 1.0),
+    # ConformalAmp.Ridge(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0),
     ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
+    # ConformalAmp.Lasso(α = 0.5, λ = 0.1, Δ = 1.0, Δ̂ = 1.0),
 ]
 coverage = 0.9
 
 fs = 12
 
-d_list = [100, 200]
+d_list = [100, 250, 500]
 plt = plot(d_list, coverage * ones(length(d_list)), label="", color=:black, xaxis="d", yaxis="coverage", legend=:topright,
 xtickfontsize=fs,ytickfontsize=fs, legendfontsize=fs)
 
 for problem in problems
-    d_list, mean_coverages_gamp, mean_time_gamp = experiment_coverage(problem, 1000, coverage)
+    d_list, mean_coverages_gamp, mean_time_gamp = experiment_coverage(problem, 100, coverage, d_list; model = "laplace")
     scatter!(plt, d_list, mean_coverages_gamp, label="$problem")
 
 end
@@ -87,18 +86,4 @@ problems = Dict(
     "Lasso (λ = 0.1)" => [0.8949999999999997, 0.8889999999999999, 0.8629999999999999, 0.8599999999999999, 0.8759999999999998],
     "Lasso (λ = 1.0)" => [0.9069999999999999, 0.8910000000000002, 0.9000000000000001, 0.8980000000000001, 0.9]
 )
-<<<<<<< HEAD
-
-fs = 12
-plt = plot(d_list, coverage * ones(length(d_list)), label="", color=:black, xaxis="d", yaxis="coverage", legend=:topright,
-xtickfontsize=fs,ytickfontsize=fs, legendfontsize=fs)
-
-for i in eachindex(problems) 
-    scatter!(plt, d_list, problems[i], label=i)
-end
-
-display(plt)
-savefig(plt, "experiments/paper/coverage.pdf")
-=======
 """
->>>>>>> clean

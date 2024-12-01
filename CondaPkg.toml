@@ -1,0 +1,4 @@
+[deps]
+scikit-learn = ""
+numpy = ""
+python = "=3.9"

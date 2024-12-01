@@ -20,7 +20,9 @@ include("gamp.jl")
 
 include("data.jl")
 include("fit.jl")
+include("vamp.jl")
 include("conformal.jl")
 include("splitconformal.jl")
+include("conformalquantile.jl")
 
 end # module ConformalAmp

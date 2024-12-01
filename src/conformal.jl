@@ -182,11 +182,11 @@ function get_confidence_interval(problem::RegressionProblem, X::AbstractMatrix, 
     ΔŴ      = get_derivative_cavity_means(X_augmented, result, Δresult)
 
     # LOWER BOUND 
-    for δy in reverse(δy_range)
+    for δy in δy_range
         # Candidate label
         y_augmented[end] = ŷ - δy
         weights = Ŵ_0 - δy * ΔŴ
-        scores           = score(problem, diag(predict(problem, weights, X_augmented)), y_augmented)
+        scores  = score(problem, diag(predict(problem, weights, X_augmented)), y_augmented)
         # Compute the quantiles and add y to the interval if it's in the quantile
         if scores[end] <= Statistics.quantile(scores[1:n], ceil(Int, coverage * (n+1)) / n)
             push!(prediction_set, ŷ - δy)
@@ -198,7 +198,7 @@ function get_confidence_interval(problem::RegressionProblem, X::AbstractMatrix, 
         # Candidate label
         y_augmented[end] = ŷ + δy
         weights = Ŵ_0 + δy * ΔŴ
-        scores           = score(problem, diag(predict(problem, weights, X_augmented)), y_augmented)
+        scores  = score(problem, diag(predict(problem, weights, X_augmented)), y_augmented)
         # Compute the quantiles and add y to the interval if it's in the quantile
         if scores[end] <= Statistics.quantile(scores[1:n], ceil(Int, coverage * (n+1)) / n)
             push!(prediction_set, ŷ + δy)
@@ -208,7 +208,11 @@ function get_confidence_interval(problem::RegressionProblem, X::AbstractMatrix, 
     return prediction_set
 end
 
-function get_confidence_interval(problem::RegressionProblem, X::AbstractMatrix, y::AbstractVector, xtest::AbstractVector, algo::FullConformal, method::ERMTaylor)
+function get_confidence_interval(problem::Union{Ridge, Lasso}, X::AbstractMatrix, y::AbstractVector, xtest::AbstractVector, algo::FullConformal, method::VAMP)
+    """
+    With GAMPTaylor, we only need to fit twice gamp, one for gamp and one for the derivative, then at each y 
+    we just have to to an matrix multilplication to get the new scores
+    """
     (; coverage, δy_range) = algo
     n, d = size(X)
     @assert size(xtest, 2) == 1
@@ -221,39 +225,36 @@ function get_confidence_interval(problem::RegressionProblem, X::AbstractMatrix, 
 
     prediction_set = []
 
-    # the only goal of result₀ is to provide a 1st approximation of the output
-    result₀ = fit(problem, X, y, ERM())
-    ŷ = predict(problem, result₀, xtest)
-    
-    δy₀ = 0.01
-    y_augmented[end] = ŷ
-    Ŵ_1     = fit_leave_one_out(problem, X_augmented, y_augmented, ERM())
-    y_augmented[end] = ŷ + δy₀
-    Ŵ_2     = fit_leave_one_out(problem, X_augmented, y_augmented, ERM())
-    # we divide by δy_perturbation so that we only have to multiply by δy after
-    ΔŴ      = (1.0 / δy₀) * (Ŵ_2 - Ŵ_1)
+    ŵ = fit(problem, X, y, method)
+    ŷ = predict(problem, ŵ, xtest)
 
     # LOWER BOUND 
-    for δy in reverse(δy_range)
+    for δy in δy_range
         # Candidate label
-        y_augmented[end] = ŷ - δy
-        weights = Ŵ_1 - δy * ΔŴ
+        y_augmented[n+1] = ŷ - δy
+        # Compute the score for all n samples by 1) computing the leave-one-out and corresponding score
+        weights          = fit_leave_one_out(problem, X_augmented, y_augmented, method)
         scores           = score(problem, diag(predict(problem, weights, X_augmented)), y_augmented)
         # Compute the quantiles and add y to the interval if it's in the quantile
-        if scores[end] <= Statistics.quantile(scores[1:n], ceil(Int, coverage * (n+1)) / n)
+        if scores[n+1] <= Statistics.quantile(scores[1:n], ceil(Int, coverage * (n+1)) / n)
             push!(prediction_set, ŷ - δy)
+        else # the confidence set is an interval so we can stop as soon as we don't add the value of y
+            break
         end
     end
 
     # UPPER BOUND 
     for δy in δy_range
         # Candidate label
-        y_augmented[end] = ŷ + δy
-        weights = Ŵ_1 + δy * ΔŴ
+        y_augmented[n+1] = ŷ + δy
+        # Compute the score for all n samples by 1) computing the leave-one-out and corresponding score
+        weights          = fit_leave_one_out(problem, X_augmented, y_augmented, method)
         scores           = score(problem, diag(predict(problem, weights, X_augmented)), y_augmented)
         # Compute the quantiles and add y to the interval if it's in the quantile
-        if scores[end] <= Statistics.quantile(scores[1:n], ceil(Int, coverage * (n+1)) / n)
+        if scores[n+1] <= Statistics.quantile(scores[1:n], ceil(Int, coverage * (n+1)) / n)
             push!(prediction_set, ŷ + δy)
+        else # the confidence set is an interval so we can stop as soon as we don't add the value of y
+            break
         end
     end
 
@@ -294,3 +295,10 @@ function get_confidence_interval(problem::Union{Ridge, Lasso}, X::AbstractMatrix
 
     return (predict(problem, ŵ, xtest) - q, predict(problem, ŵ, xtest) + q)
 end
+
+function get_confidence_interval(problem::Union{Ridge, Lasso}, X::AbstractMatrix, y::AbstractVector, xtest::AbstractMatrix, algo::SplitConformal, method::Method)
+    ŵ, q = split_conformal(problem, X, y, algo.coverage)
+
+    return (predict(problem, ŵ, xtest) .- q, predict(problem, ŵ, xtest) .+ q)
+end
+

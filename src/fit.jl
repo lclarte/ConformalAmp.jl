@@ -15,6 +15,11 @@ end
 @kwdef struct ERM <: Method
 end
 
+@kwdef struct VAMP <: Method 
+    max_iter::Integer
+    rtol::Float64
+end
+
 ### 
 
 function fit(problem::Ridge, X::AbstractMatrix, y::AbstractVector, ::ERM)
@@ -48,8 +53,9 @@ function fit(problem::Pinball, X::AbstractMatrix, y::AbstractVector, ::ERM)
     https://juliaai.github.io/MLJLinearModels.jl/dev/api/#MLJLinearModels.QuantileRegression
     with an intercept, the intercept is the LAST ELEMENT OF THE VECTOR RETURNED
     """
+    n, d = size(X)
     model = MLJLinearModels.QuantileRegression(
-        ; delta = problem.q, lambda = problem.λ, gamma = 0.0, fit_intercept = problem.use_bias, scale_penalty_with_samples = false, penalize_intercept = false
+        ; delta = problem.q, lambda = problem.λ / n, gamma = 0.0, fit_intercept = problem.use_bias, scale_penalty_with_samples = false, penalize_intercept = false
     )
     return MLJLinearModels.fit(model, X, y)
 end
@@ -125,4 +131,16 @@ function predict(::Logistic, ŵ::AbstractVector, x::AbstractVector)
     return sign(ŵ'x)
 end
 
-#
+### for VAMP
+
+function fit(problem::Union{Ridge, Lasso}, X::AbstractMatrix, y::AbstractVector, method::VAMP)
+    x̂_1, α_1, γ_1, x̂_2, α_2, γ_2 = vamp(problem, X, y; n_iterations = method.max_iter, rtol = method.rtol)
+    return x̂_1
+end
+
+function fit_leave_one_out(problem::Ridge, X::AbstractMatrix, y::AbstractVector, method::VAMP)
+    (; Δ̂, λ) = problem
+    x̂_1, α_1, γ_1, x̂_2, α_2, γ_2  = vamp(problem, X, y; n_iterations = method.max_iter, rtol = method.rtol)
+    # return loo_vamp(X, y, Δ̂, x̂_1, α_1, γ_1, x̂_2, α_2, γ_2)
+    return iterate_loo_vamp_ridge(X, y, problem.Δ̂, x̂_1, α_1, γ_1, x̂_2, α_2, γ_2)
+end
