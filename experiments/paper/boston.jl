@@ -4,6 +4,7 @@ using DataFrames
 using CSV
 using ConformalAmp
 using ProgressBars
+using Random
 
 # load the data
 data = CSV.read("experiments/paper/boston.csv", DataFrame, missingstring=["NA"])
@@ -23,26 +24,17 @@ x ./= sqrt(d)
 y = (y .- mean(y)) / std(y)
 
 problem = ConformalAmp.Lasso(α = n / d, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
-ŵ_gamp = ConformalAmp.fit(problem, x, y, ConformalAmp.GAMP(max_iter = 100, rtol = 1e-3))
-ŵ_erm = ConformalAmp.fit(problem, x, y, ConformalAmp.ERM())
-
-plt = scatter()
-scatter(ŵ_gamp, ŵ_erm, label = "GAMP vs ERM")
 
 n_train = Integer(floor(0.8 * n))
 n_test = n - n_train
-x_train, x_test = x[1:n_train, :], x[n_train+1:end, :]
-y_train, y_test = y[1:n_train], y[n_train+1:end]
 
 coverage = 0.9
 
-ci_gamp_list = []
 fcp = ConformalAmp.FullConformal(δy_range = 0.0:0.05:7.5, coverage = coverage)
-gamp_time_list = []
 
 # COMMENT THE LINE DEPENDING ON WHICH ALGORITHM YOU WANT TO USE
-method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-5)
-# method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4)
+# method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-5)
+method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4)
 
 println("Using method : $method")
 
@@ -50,10 +42,20 @@ coverage_gamp_list = []
 mean_length_gamp_list = []
 gamp_time_list = []
 
-
-seeds = 20
+seeds = 5
 
 for seed in ProgressBar(1:seeds)
+    ci_gamp_list = []
+    gamp_time_list = []
+    Random.seed!(seed)
+    idx = shuffle(1:size(x, 1))
+    x = x[idx, :]
+    y = y[idx]
+
+    x_train, x_test = x[1:n_train, :], x[n_train+1:end, :]
+    y_train, y_test = y[1:n_train], y[n_train+1:end]
+
+
     for i in 1:n_test
         # compute the confidencei ntervals 
         debut = time()
@@ -71,6 +73,7 @@ for seed in ProgressBar(1:seeds)
 
     push!(coverage_gamp_list, coverage_gamp)
     push!(mean_length_gamp_list, mean_length_gamp)
+    print("Coverage of GAMP : ", coverage_gamp, " ± ", mean_length_gamp)
 end
 
 println("Coverage of GAMP : ", mean(coverage_gamp_list), " ± ", std(coverage_gamp_list))
