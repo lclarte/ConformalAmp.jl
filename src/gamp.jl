@@ -287,6 +287,14 @@ function compute_order_one_perturbation_gamp(problem::RegressionProblem, X::Abst
         ΔA_new = - (sum(Σ.^2) * mean(Δ∂g) / d) * ones(d)
         Δb_new = X' * Δg + A .* Δx̂ + ΔA_new .* x̂ # OK
 
+        if iteration > 1
+            ΔA = ΔA_new * step + ΔA * (1 - step)
+            Δb = Δb_new * step + Δb * (1 - step)
+        else
+            ΔA = copy(ΔA_new)
+            Δb = copy(Δb_new)
+        end
+
         Δx̂_old = copy(Δx̂)
 
         Δx̂ = ∂bprior_[1] .* Δb .+ ∂Aprior_[1] .* ΔA # OK

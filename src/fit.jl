@@ -35,7 +35,6 @@ function fit(problem::Lasso, X::AbstractMatrix, y::AbstractVector, ::ERM)
     )
     w = MLJLinearModels.fit(model, X, y)
     return w
-
 end
 
 function fit(problem::Logistic, X::AbstractMatrix, y::AbstractVector, ::ERM)
@@ -79,8 +78,8 @@ function fit_leave_one_out(problem::Problem, X::AbstractMatrix, y::AbstractVecto
 end
 
 function fit_leave_one_out(problem::Problem, X::AbstractMatrix, y::AbstractVector, method::Union{GAMP, GAMPTaylor})
-    (; x̂, v̂, ω) = gamp(problem, X, y; max_iter=method.max_iter, rtol=method.rtol)
-    return get_cavity_means_from_gamp(problem, X, y, x̂, v̂, ω; rtol = method.rtol)
+    result = gamp(problem, X, y; max_iter=method.max_iter, rtol=method.rtol)
+    return get_cavity_means_from_gamp(X, result)
 end
 
 function predict(::RegressionProblem, ŵ::AbstractVector, X::AbstractMatrix; bias::Real = 0.0)

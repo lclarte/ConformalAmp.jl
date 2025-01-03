@@ -9,7 +9,7 @@ using ProgressBars
 using StableRNGs: StableRNG
 using Statistics
 
-function compute_coverage_gamp_taylor(problem::ConformalAmp.Problem; d::Integer = 100, ntest::Integer = 10, rng_seed::Integer = 0, coverage::Real = 0.9, model::String = "gaussian")
+function compute_coverage_gamp_taylor(problem::ConformalAmp.Problem; d::Integer = 100, ntest::Integer = 1, rng_seed::Integer = 0, coverage::Real = 0.9, model::String = "gaussian")
     """
     We don't need to compute the coverage of ERM since we know that it's correct, the priority is to compute the one of
     GAMP Taylor
@@ -20,8 +20,8 @@ function compute_coverage_gamp_taylor(problem::ConformalAmp.Problem; d::Integer 
     xtest   = ConformalAmp.sample_data_any_n(rng, d, ntest, model = model)
     ytest   = ConformalAmp.sample_labels(rng, problem, xtest, w)
 
-    algo = ConformalAmp.FullConformal(coverage = coverage, δy_range = -0.0:0.05:5.0)
-    method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)
+    algo = ConformalAmp.FullConformal(coverage = coverage, δy_range = 0.0:0.05:7.5)
+    method = ConformalAmp.GAMP(max_iter = 1000, rtol = 1e-5)
     
     total_covered = 0
 
@@ -59,21 +59,22 @@ end
 
 problems = [
     ConformalAmp.Ridge(α = 0.5, λ = 0.1, Δ = 1.0, Δ̂ = 1.0),
-    # ConformalAmp.Ridge(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0),
-    ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
+    ConformalAmp.Ridge(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0),
+    ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0),
     # ConformalAmp.Lasso(α = 0.5, λ = 0.1, Δ = 1.0, Δ̂ = 1.0),
 ]
 coverage = 0.9
 
 fs = 12
 
-d_list = [100, 250, 500]
+d_list = [300]
 plt = plot(d_list, coverage * ones(length(d_list)), label="", color=:black, xaxis="d", yaxis="coverage", legend=:topright,
 xtickfontsize=fs,ytickfontsize=fs, legendfontsize=fs)
 
 for problem in problems
-    d_list, mean_coverages_gamp, mean_time_gamp = experiment_coverage(problem, 100, coverage, d_list; model = "laplace")
+    d_list, mean_coverages_gamp, mean_time_gamp = experiment_coverage(problem, 1000, coverage, d_list; model = "gaussian")
     scatter!(plt, d_list, mean_coverages_gamp, label="$problem")
+    println("Mean coverage for $problem is $(mean_coverages_gamp)")
 
 end
 display(plt)
