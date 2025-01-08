@@ -46,7 +46,6 @@ coverage = 0.9
 # COMMENT THE LINE DEPENDING ON WHICH ALGORITHM YOU WANT TO USE
 method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)
 # method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5)
-println("Using method : $method")
 
 seeds = 20
 for seed in ProgressBar(1:seeds)
@@ -82,6 +81,6 @@ for seed in ProgressBar(1:seeds)
 end
 
 println("$problem")
-println("AMP conformal coverage : ", mean(coverage_list), " with std : ", std(coverage_list))
-println("AMP conformal mean length : ", mean(mean_length_list), " with std : ", std(mean_length_list))
-println("Average time for GAMP : ", mean(time_gamp_list), " with std : ", std(time_gamp_list))
+println("$method conformal coverage : ", mean(coverage_list), " with std : ", std(coverage_list))
+println("$method conformal mean length : ", mean(mean_length_list), " with std : ", std(mean_length_list))
+println("Average time for $method : ", mean(time_gamp_list), " with std : ", std(time_gamp_list))

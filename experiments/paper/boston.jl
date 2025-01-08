@@ -75,6 +75,6 @@ for seed in ProgressBar(1:seeds)
     push!(mean_length_gamp_list, mean_length_gamp)
 end
 
-println("Coverage of GAMP : ", mean(coverage_gamp_list), " ± ", std(coverage_gamp_list))
-println("Mean length of GAMP : ", mean(mean_length_gamp_list), " ± ", std(mean_length_gamp_list))
-println("Mean time of GAMP : ", mean(gamp_time_list))
+println("Coverage of $method : ", mean(coverage_gamp_list), " ± ", std(coverage_gamp_list))
+println("Mean length of $method : ", mean(mean_length_gamp_list), " ± ", std(mean_length_gamp_list))
+println("Mean time of $method : ", mean(gamp_time_list))
