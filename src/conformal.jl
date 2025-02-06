@@ -302,3 +302,14 @@ function get_confidence_interval(problem::Union{Ridge, Lasso}, X::AbstractMatrix
     return (predict(problem, ŵ, xtest) .- q, predict(problem, ŵ, xtest) .+ q)
 end
 
+function get_confidence_interval(problem::Lasso, X::AbstractMatrix, y::AbstractVector, xtest::AbstractMatrix, algo::FullConformal, ::ERM)
+    (; λ) = problem
+    κ = 1.0 - algo.coverage
+
+    beta0 = fit(problem, X, y, ERM())
+
+    R"result <- ConfLassoSimple($X, $y, $beta0, $λ, $xtest, $κ)"
+
+    result = rcopy(R"result")
+    return result[:, 1:2]
+end

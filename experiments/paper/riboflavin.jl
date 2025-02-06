@@ -10,6 +10,7 @@ using Random
 using ConformalAmp
 
 data = CSV.read("experiments/paper/riboflavin.csv", DataFrame)
+
 X = data[:, 2:end]
 println("Shape of the data : ", size(X))
 y = data[:, 1]
@@ -29,12 +30,13 @@ problem = ConformalAmp.Lasso(α = size(X, 1) / size(X, 2), λ = 0.25, Δ = 1.0, 
 # split train test 
 n_train = 50
 
+
 # shuffle the data for the train test split
 # allow to choose the seed
 
 # COMMENT THE LINE DEPENDING ON WHICH ALGORITHM YOU WANT TO USE
-method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)
-# method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5)
+# method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)
+method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4)
 
 """
 seeds = 20
@@ -132,4 +134,12 @@ for target_coverage in target_coverages
     push!(mean_length_stds, std(mean_length_gamp_list))
 end
 
-plot(target_coverages, coverage_means, ribbon = coverage_stds, label = "Coverage", xlabel = "Target coverage", ylabel = "Coverage", title = "Coverage of the GAMP", fmt = :png)
+if method isa ConformalAmp.GAMP
+    method_name = "GAMP"
+else
+    method_name = "Taylor-AMP"
+end
+
+plot(target_coverages, coverage_means, ribbon = coverage_stds, label = "Coverage of $method_name", xlabel = "Target coverage", ylabel = "Coverage", fmt = :png)
+plot!(target_coverages, target_coverages, label = "", linestyle = :dash, color = :black)
+savefig("experiments/paper/riboflavin_coverage_$method_name.png")

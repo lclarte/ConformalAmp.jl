@@ -6,6 +6,7 @@ using NLSolvers
 using QuadGK
 using Revise
 using Statistics
+using RCall
 
 include("problems.jl")
 include("logistic_channel.jl")

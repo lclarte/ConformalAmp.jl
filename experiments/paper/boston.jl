@@ -31,13 +31,13 @@ n_test = n - n_train
 target_coverage = 0.9
 
 # COMMENT THE LINE DEPENDING ON WHICH ALGORITHM YOU WANT TO USE
-# method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)
-method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-4)
+method = ConformalAmp.GAMPTaylor(max_iter = 100, rtol = 1e-4)
+# method = ConformalAmp.GAMP(max_iter = 100, rtol = 1e-5)
 
 println("Using method : $method")
 
 function run_experiment(x, y, target_coverage::Real, method, seeds::Integer)
-    fcp = ConformalAmp.FullConformal(δy_range = 0.0:0.1:5.0, coverage = target_coverage)
+    fcp = ConformalAmp.FullConformal(δy_range = 0.0:0.05:5.0, coverage = target_coverage)
     coverage_gamp_list = []
     mean_length_gamp_list = []
     gamp_time_list = []
@@ -85,7 +85,8 @@ mean_length_means = []
 mean_length_stds = []
 
 for target_coverage in target_coverages
-    coverage_gamp_list, mean_length_gamp_list, gamp_time_list = run_experiment(x, y, target_coverage, method, 20)
+    println("Coverage = $target_coverage")
+    coverage_gamp_list, mean_length_gamp_list, gamp_time_list = run_experiment(x, y, target_coverage, method, 100)
     push!(coverage_means, mean(coverage_gamp_list))
     push!(coverage_stds, std(coverage_gamp_list))
     push!(mean_length_means, mean(mean_length_gamp_list))
