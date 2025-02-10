@@ -11,6 +11,10 @@ end
     coverage::Float64
 end
 
+@kwdef struct JackknifePlus <: UncertaintyAlgorithm
+    coverage::Float64
+end
+
 # score function 
 
 function score(::Logistic, y::Real, confidence::Real)
@@ -302,7 +306,11 @@ function get_confidence_interval(problem::Union{Ridge, Lasso}, X::AbstractMatrix
     return (predict(problem, ŵ, xtest) .- q, predict(problem, ŵ, xtest) .+ q)
 end
 
-function get_confidence_interval(problem::Lasso, X::AbstractMatrix, y::AbstractVector, xtest::AbstractMatrix, algo::FullConformal, ::ERM)
+function get_confidence_interval(problem::Lasso, X::AbstractMatrix, y::AbstractVector, xtest::AbstractMatrix, algo::FullConformal, ::ExactHomotopy)
+    R"""
+    source("src/conf_lasso_utils.R")
+    """
+
     (; λ) = problem
     κ = 1.0 - algo.coverage
 
@@ -312,4 +320,20 @@ function get_confidence_interval(problem::Lasso, X::AbstractMatrix, y::AbstractV
 
     result = rcopy(R"result")
     return result[:, 1:2]
+end
+
+function get_confidence_interval(problem::Problem, X::AbstractMatrix, y::AbstractVector, xtest::AbstractVector, algo::JackknifePlus, method::Method)
+    (; coverage) = algo
+    α = (1. - coverage) / 2.
+
+    # compute the leave-one-out estimators
+    ŵ_loo_matrix = fit_leave_one_out(problem, X, y, method)
+    # compute the residuals for each sample
+    residuals = abs.([y[i] - dot(ŵ_loo_matrix[i, :], X[i, :]) for i in eachindex(y)])
+    # compute the prediction on the test point 
+    ŷ = predict(problem, ŵ_loo_matrix, xtest)
+
+    n = length(y)
+    lower, upper = Statistics.quantile(ŷ - residuals, ceil(Int, α * (n+1)) / n), Statistics.quantile(ŷ + residuals, ceil(Int, (1.0 - α) * (n+1)) / n)
+    return (lower, upper)
 end

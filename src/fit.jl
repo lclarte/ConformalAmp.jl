@@ -20,6 +20,10 @@ end
     rtol::Float64
 end
 
+# Coming from "Exact conformalization of Lasso [...]", Lei 2017
+@kwdef struct ExactHomotopy <: Method
+end
+
 ### 
 
 function fit(problem::Ridge, X::AbstractMatrix, y::AbstractVector, ::ERM)

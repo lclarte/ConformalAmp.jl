@@ -1,3 +1,5 @@
+# This R file comes from this paper : https://arxiv.org/abs/1708.00427
+
 ConfLasso <- function(X,Y,beta0,lambda,x0,alpha,verbose=F,shift.range=F) {
   y.range <- range(Y)
   n0 <- dim(x0)[1]

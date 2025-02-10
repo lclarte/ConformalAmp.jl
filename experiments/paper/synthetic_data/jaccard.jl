@@ -26,13 +26,14 @@ function compute_jaccard_amp_scp(problem::ConformalAmp.Problem; d::Integer = 100
 
     xtest_array = ConformalAmp.sample_data_any_n(rng, d, ntest, model = model)
 
-    algo = ConformalAmp.FullConformal(δy_range = 0.0:0.05:5.0, coverage = 0.9)
+    algo = ConformalAmp.FullConformal(δy_range = 0.0:0.1:10.0, coverage = 0.9)
     scp_algo = ConformalAmp.SplitConformal(coverage = 0.9)
 
     jaccard_list_erm_amptaylor = []
     jaccard_list_erm_scp = []
 
-    for i in 1:ntest
+    
+    for i in ProgressBar(1:ntest)
         xtest = xtest_array[i, :]
         ci_erm = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo, ConformalAmp.ERM())
         ci_amptaylor = ConformalAmp.get_confidence_interval(problem, X, y, xtest, algo,     
@@ -53,16 +54,16 @@ end
 d = 50
 
 problems = [
-    ConformalAmp.Lasso(α = α, λ = 0.01, Δ = 1.0, Δ̂ = 1.0),
+    # ConformalAmp.Lasso(α = α, λ = 0.01, Δ = 1.0, Δ̂ = 1.0),
     ConformalAmp.Lasso(α = α, λ = 0.1, Δ = 1.0, Δ̂ = 1.0),
     ConformalAmp.Lasso(α = α, λ = 1.0, Δ = 1.0, Δ̂ = 1.0)
 ]
 
 for problem in problems
     λ = problem.λ
-    jaccard_list_erm_amptaylor, jaccard_list_erm_scp = compute_jaccard_amp_scp(problem; d=d, ntest=50, seed=0, model="laplace")
+    jaccard_list_erm_amptaylor, jaccard_list_erm_scp = compute_jaccard_amp_scp(problem; d=d, ntest=100, seed=0, model="gaussian")
 
-    println("Mean for $problem : $(mean(jaccard_list_erm_amptaylor)), $(mean(jaccard_list_erm_scp))")
-    # print standard deviation
-    println("Std for $λ : $(std(jaccard_list_erm_amptaylor)), $(std(jaccard_list_erm_scp))")
+    println("For $problem : ")
+    println("Jaccard for AMP is $(mean(jaccard_list_erm_amptaylor)) ± $(std(jaccard_list_erm_amptaylor))")
+    println("Jaccard for SCP is $(mean(jaccard_list_erm_scp)) ± $(std(jaccard_list_erm_scp))")
 end

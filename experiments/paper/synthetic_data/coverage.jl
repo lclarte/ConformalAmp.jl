@@ -58,21 +58,22 @@ function experiment_coverage(problem::ConformalAmp.Problem, nseeds::Integer = 10
 end
 
 problems = [
-    ConformalAmp.Ridge(α = 0.5, λ = 0.1, Δ = 1.0, Δ̂ = 1.0),
-    ConformalAmp.Ridge(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0),
-    ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0),
+    # ConformalAmp.Ridge(α = 0.5, λ = 0.1, Δ = 1.0, Δ̂ = 1.0),
+    # ConformalAmp.Ridge(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0),
+    # ConformalAmp.Lasso(α = 0.5, λ = 1.0, Δ = 1.0, Δ̂ = 1.0),
     # ConformalAmp.Lasso(α = 0.5, λ = 0.1, Δ = 1.0, Δ̂ = 1.0),
+    ConformalAmp.Pinball(Δ = 1.0, q = 0.5, λ = 1.0, α = 0.5)
 ]
-coverage = 0.9
+coverage = 0.5
 
 fs = 12
 
-d_list = [300]
+d_list = [100, 200, 500]
 plt = plot(d_list, coverage * ones(length(d_list)), label="", color=:black, xaxis="d", yaxis="coverage", legend=:topright,
 xtickfontsize=fs,ytickfontsize=fs, legendfontsize=fs)
 
 for problem in problems
-    d_list, mean_coverages_gamp, mean_time_gamp = experiment_coverage(problem, 1000, coverage, d_list; model = "gaussian")
+    d_list, mean_coverages_gamp, mean_time_gamp = experiment_coverage(problem, 100, coverage, d_list; model = "gaussian")
     scatter!(plt, d_list, mean_coverages_gamp, label="$problem")
     println("Mean coverage for $problem is $(mean_coverages_gamp)")
 
